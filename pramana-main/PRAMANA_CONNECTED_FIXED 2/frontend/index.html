@@ -1,0 +1,2222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PRAMĀṆA · Online Verification of Weighing &amp; Measuring Instruments</title>
+  <meta name="application-name" content="PRAMANA" />
+  <meta name="description" content="Online verification system for weighing and measuring instruments. Department of Consumer Affairs. Smart India Hackathon 2026 problem SIH26036." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,480;9..144,640;9..144,720&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Tiro+Devanagari+Hindi:ital@0;1&display=swap" rel="stylesheet" />
+  <!-- Leaflet CSS for Enforcement Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <style>
+    :root {
+      --ink: #1f1a14;
+      --navy: #1f3a5f;
+      --navy-2: #2a4d7c;
+      --cream: #f7f2ea;
+      --paper: #fbf8f2;
+      --white: #ffffff;
+      --saffron: #e07020;
+      --saffron-d: #b85212;
+      --green: #1a6b45;
+      --green-d: #0e4a2e;
+      --gold: #b8893a;
+      --gold-s: #f2e3c6;
+      --rule: rgba(31, 26, 20, 0.1);
+      --danger: #9c2b1a;
+      --ok: #1a6b45;
+      --warn: #9a6b12;
+      --muted: #73685d;
+      --shadow: 0 16px 40px rgba(31, 26, 20, 0.08);
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+      --serif: "Fraunces", "Times New Roman", serif;
+      --sans: "Source Sans 3", "Segoe UI", sans-serif;
+      --hi: "Tiro Devanagari Hindi", serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(224, 112, 32, 0.06), transparent 50%),
+        radial-gradient(900px 500px at 110% 10%, rgba(26, 107, 69, 0.06), transparent 45%),
+        var(--cream);
+      letter-spacing: 0.01em;
+    }
+    .tri {
+      height: 4px;
+      background: linear-gradient(90deg, #ff9933 0 33.3%, #fff 33.3% 66.6%, #138808 66.6%);
+      position: sticky; top: 0; z-index: 80;
+    }
+    a { color: inherit; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+
+    .hero { max-width: 1180px; margin: 0 auto; padding: 28px 24px 64px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 36px; }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .brand-emblem {
+      width: 48px; height: 48px; border-radius: 8px; background: var(--navy); color: var(--gold-s);
+      display: grid; place-items: center; font-size: 22px; border: 1.5px solid var(--gold);
+      box-shadow: 0 4px 12px rgba(31,58,95,0.15);
+    }
+    .brand .nm { font-family: var(--serif); font-weight: 640; font-size: 22px; letter-spacing: 0.08em; color: var(--navy); }
+    .brand .sub { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+    .toplinks { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; position: relative; }
+    .linkish {
+      background: transparent; border: 1px solid var(--rule); padding: 8px 14px;
+      border-radius: 999px; color: var(--navy); display: inline-flex; align-items: center; gap: 6px; font-weight: 600;
+      transition: all 0.2s;
+    }
+    .linkish:hover { background: rgba(31,58,95,0.05); border-color: var(--navy); }
+    
+    .bell-linkish {
+      background: transparent; border: 1px solid var(--rule); width: 42px; height: 42px;
+      border-radius: 50%; color: var(--navy); display: inline-flex; align-items: center; justify-content: center;
+      transition: all 0.2s; position: relative; cursor: pointer;
+    }
+    .bell-linkish:hover { background: rgba(31,58,95,0.05); border-color: var(--navy); }
+    .bell-badge {
+      position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--saffron); border-radius: 50%;
+    }
+
+    .kicker { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--saffron-d); margin: 0 0 10px; font-weight: 700; }
+    h1.display {
+      font-family: var(--serif); font-weight: 640; font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.08; margin: 0 0 14px; max-width: 18ch; color: var(--navy);
+    }
+    .lede { font-size: 18px; color: #4a3f35; max-width: 58ch; line-height: 1.5; }
+    .pschip {
+      display: inline-flex; gap: 8px; align-items: center;
+      font-family: var(--mono); font-size: 12px; background: var(--navy); color: var(--gold-s);
+      padding: 6px 10px; border-radius: 4px; margin-top: 16px;
+    }
+
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 36px; }
+    @media (max-width: 800px) { .stats-row { grid-template-columns: 1fr 1fr; } }
+    .stat { background: rgba(255,255,255,0.7); border: 1px solid var(--rule); padding: 14px 16px; border-radius: 6px; }
+    .stat b { display: block; font-family: var(--serif); font-size: 26px; color: var(--navy); }
+    .stat span { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+
+
+    /* ---------- enhanced public home ---------- */
+    .home-hero-grid { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr); gap:34px; align-items:center; margin-top:14px; }
+    .home-copy { padding:18px 0 8px; }
+    .home-copy .lede { max-width:62ch; }
+    .home-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
+    .home-primary { background:var(--saffron); color:#fff; border-color:var(--saffron); padding:11px 17px; }
+    .home-primary:hover { background:var(--saffron-d); border-color:var(--saffron-d); }
+    .home-verify-card { background:linear-gradient(145deg,#fff,#f4eee4); border:1px solid var(--rule); border-radius:12px; padding:24px; box-shadow:0 16px 34px rgba(31,26,20,.09); position:relative; overflow:hidden; }
+    .home-verify-card:before { content:""; position:absolute; width:150px; height:150px; border-radius:50%; right:-70px; top:-70px; background:rgba(224,112,32,.10); }
+    .home-verify-card h2 { font-family:var(--serif); color:var(--navy); margin:0 0 7px; font-size:25px; }
+    .home-verify-card p { color:var(--muted); font-size:13px; line-height:1.45; margin:0 0 16px; }
+    .home-verify-input { display:flex; gap:8px; }
+    .home-verify-input input { flex:1; min-width:0; border:1px solid var(--rule); border-radius:6px; padding:11px 12px; background:#fff; color:var(--ink); outline:none; }
+    .home-verify-input input:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(31,58,95,.08); }
+    .home-verify-input button { border:0; border-radius:6px; background:var(--navy); color:#fff; padding:0 15px; font-weight:700; }
+    .home-trust { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:28px; }
+    .home-trust-item { background:rgba(255,255,255,.68); border:1px solid var(--rule); border-radius:7px; padding:13px 14px; }
+    .home-trust-item b { display:block; color:var(--navy); font-family:var(--serif); font-size:23px; }
+    .home-trust-item span { display:block; color:var(--muted); font-size:10px; letter-spacing:.09em; text-transform:uppercase; font-weight:700; margin-top:2px; }
+    .home-section { max-width:1180px; margin:0 auto; padding:54px 24px 0; }
+    .home-section-head { display:flex; justify-content:space-between; align-items:end; gap:20px; margin-bottom:20px; }
+    .home-section-head h2 { font-family:var(--serif); color:var(--navy); font-size:31px; margin:0 0 4px; }
+    .home-section-head p { color:var(--muted); margin:0; max-width:65ch; font-size:14px; line-height:1.5; }
+    .workflow-line { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+    .workflow-step { position:relative; background:#fff; border:1px solid var(--rule); border-radius:8px; padding:18px 15px; min-height:140px; }
+    
+    .workflow-num { font-family:var(--mono); color:var(--saffron-d); font-size:11px; letter-spacing:.12em; font-weight:700; }
+    .workflow-step h3 { font-family:var(--serif); color:var(--navy); margin:8px 0 6px; font-size:19px; }
+    .workflow-step p { color:var(--muted); font-size:12px; line-height:1.45; margin:0; }
+    .home-actions-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+    .home-action-card { background:#fff; border:1px solid var(--rule); border-radius:9px; padding:20px; transition:transform .18s,box-shadow .18s,border-color .18s; }
+    .home-action-card:hover { transform:translateY(-2px); border-color:#cfc3b2; box-shadow:var(--shadow); }
+    .home-action-icon { width:38px; height:38px; border-radius:8px; display:grid; place-items:center; background:#eef2f7; color:var(--navy); font-size:19px; margin-bottom:13px; }
+    .home-action-card h3 { font-family:var(--serif); color:var(--navy); margin:0 0 7px; font-size:20px; }
+    .home-action-card p { color:var(--muted); font-size:13px; line-height:1.45; min-height:55px; margin:0 0 13px; }
+    .home-action-card button { border:0; background:none; padding:0; color:var(--navy); font-weight:700; font-size:12px; }
+    .owner-strip { display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; background:var(--navy); color:#fff; border-radius:10px; padding:24px 26px; margin-top:54px; }
+    .owner-strip h2 { font-family:var(--serif); margin:0 0 7px; font-size:27px; color:#fff; }
+    .owner-strip p { margin:0; color:rgba(255,255,255,.78); font-size:14px; line-height:1.5; max-width:72ch; }
+    .owner-steps { display:flex; gap:8px; flex-wrap:wrap; margin-top:13px; }
+    .owner-step-pill { font-family:var(--mono); font-size:10px; border:1px solid rgba(255,255,255,.2); padding:6px 9px; border-radius:999px; color:#fff; }
+    .owner-strip button { background:var(--saffron); color:#fff; border:1px solid var(--saffron); border-radius:999px; padding:11px 17px; font-weight:700; white-space:nowrap; }
+    .why-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:54px; }
+    .why-item { padding:18px; border-top:2px solid var(--navy); background:rgba(255,255,255,.55); border-left:1px solid var(--rule); border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); border-radius:0 0 8px 8px; }
+    .why-item h3 { font-family:var(--serif); color:var(--navy); margin:0 0 7px; font-size:18px; }
+    .why-item p { color:var(--muted); font-size:12px; line-height:1.5; margin:0; }
+    .home-notice { display:flex; gap:12px; align-items:flex-start; border:1px solid #e4d7c2; background:#f8f0e4; padding:14px 16px; border-radius:7px; margin-top:22px; }
+    .home-notice b { color:var(--saffron-d); font-size:11px; letter-spacing:.12em; text-transform:uppercase; }
+    .home-notice span { color:#4a3f35; font-size:13px; line-height:1.45; }
+    @media (max-width: 900px) {
+      .home-hero-grid { grid-template-columns:1fr; }
+      .home-trust { grid-template-columns:1fr 1fr; }
+      .workflow-line { grid-template-columns:1fr; }
+      .workflow-step:not(:last-child):after { content:"↓"; right:auto; left:50%; top:auto; bottom:-17px; transform:translateX(-50%); }
+      .home-actions-grid,.why-grid { grid-template-columns:1fr 1fr; }
+      .owner-strip { grid-template-columns:1fr; }
+    }
+    @media (max-width: 560px) {
+      .home-trust,.home-actions-grid,.why-grid { grid-template-columns:1fr; }
+      .home-verify-input { flex-direction:column; }
+      .home-verify-input button { padding:11px; }
+      .home-section { padding-left:18px; padding-right:18px; }
+      .hero { padding-left:18px; padding-right:18px; }
+    }
+
+    .creamy-footer {
+      background: #eae2d5; color: #2d2620; margin-top: 60px; border-top: 1px solid var(--rule); padding: 24px 20px; text-align: center; font-size: 14px;
+    }
+    .creamy-footer-links {
+      display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; font-weight: 600;
+    }
+    .creamy-footer-links a { color: var(--navy); text-decoration: none; }
+    .creamy-footer-links a:hover { text-decoration: underline; color: var(--saffron); }
+
+    .auth-shell-center {
+      min-height: calc(100vh - 4px); display: grid; place-items: center; padding: 24px;
+      background: radial-gradient(1200px 600px at 10% -10%, rgba(224, 112, 32, 0.08), transparent 50%),
+                  radial-gradient(900px 500px at 110% 10%, rgba(26, 107, 69, 0.08), transparent 45%), var(--cream);
+    }
+    .login-card-unified {
+      background: var(--white); color: var(--ink); border: 1px solid var(--rule);
+      border-radius: 12px; padding: 36px; width: 100%; max-width: 480px; box-shadow: var(--shadow); position: relative;
+    }
+    .login-card-unified .brand-center { text-align: center; margin-bottom: 24px; }
+    .login-card-unified .brand-center .emblem-lg {
+      width: 64px; height: 64px; border-radius: 12px; background: var(--navy); color: var(--gold-s);
+      display: inline-grid; place-items: center; font-size: 32px; border: 2px solid var(--gold); margin-bottom: 10px;
+      box-shadow: 0 4px 16px rgba(31,58,95,0.15);
+    }
+    .login-card-unified h2 { font-family: var(--serif); font-size: 24px; margin: 0 0 4px; text-align: center; color: var(--navy); }
+    .login-card-unified p.subt { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+    .role-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #eee5d8; padding: 4px; border-radius: 8px; margin-bottom: 24px; }
+    .role-tab-btn { background: transparent; border: none; padding: 10px; color: var(--muted); font-weight: 600; font-size: 13px; border-radius: 6px; text-align: center; transition: all 0.2s; }
+    .role-tab-btn.active { background: var(--saffron); color: #fff; box-shadow: 0 4px 12px rgba(224,112,32,0.3); }
+    .auth-field { margin-bottom: 16px; }
+    .auth-field label { display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 6px; color: var(--muted); font-weight: 700; }
+    .auth-field input {
+      width: 100%; padding: 14px; background: #fff; border: 1px solid var(--rule); color: var(--ink); border-radius: 6px; outline: none; font-size: 15px;
+    }
+    .auth-field input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,137,58,0.15); }
+    .btn-auth-submit {
+      width: 100%; background: var(--saffron); color: #fff; padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 16px; margin-top: 8px;
+      box-shadow: 0 6px 20px rgba(224,112,32,0.3); transition: background 0.2s;
+    }
+    .btn-auth-submit:hover { background: #c86216; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border: none; border-radius: 4px; padding: 10px 16px; font-weight: 600;
+      letter-spacing: 0.04em; transition: background 0.15s;
+    }
+    .btn-saffron { background: var(--saffron); color: #fff; }
+    .btn-saffron:hover { background: #c86216; }
+    .btn-gold { background: var(--gold-s); color: var(--navy); }
+    .btn-gold:hover { background: #f0e1b8; }
+    .btn-navy { background: var(--navy); color: #f7f0e4; }
+    .btn-navy:hover { background: #2a4d7c; }
+    .btn-ghost { background: transparent; border: 1px solid currentColor; color: inherit; }
+    .btn-full { width: 100%; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-ok { background: var(--green); color: #fff; }
+
+    .app { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 4px); }
+    @media (max-width: 920px) { .app { grid-template-columns: 1fr; } .side { display: none; } }
+    .side {
+      background: var(--navy); color: #eadfcb; padding: 18px 14px;
+      display: flex; flex-direction: column; gap: 6px; border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .side .brand { color: #eadfcb; padding: 6px 8px 16px; }
+    .side .brand .sub { color: #9aa6b8; }
+    .navbtn {
+      text-align: left; background: transparent; border: none; color: #d7cbb4;
+      padding: 10px 12px; border-radius: 6px; display: flex; gap: 10px; align-items: center; font-size: 14px; font-weight: 500;
+      transition: background 0.15s; width: 100%;
+    }
+    .navbtn.active, .navbtn:hover { background: rgba(232, 211, 164, 0.12); color: #fff; }
+    .navbtn small { display: block; color: #8b97aa; font-weight: 400; font-size: 11px; }
+    .side .who {
+      margin-top: auto; padding: 12px; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(232,211,164,0.15); border-radius: 6px; font-size: 13px;
+    }
+    .side .who b { display: block; font-family: var(--serif); font-size: 16px; color: #fff; }
+    .main { padding: 24px 32px 56px; background: var(--paper); min-height: calc(100vh - 4px); }
+    .crumb { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+    .main h1 { font-family: var(--serif); font-size: 32px; margin: 0 0 6px; color: var(--navy); }
+    .main .intro { color: #4a3f35; margin: 0 0 24px; max-width: 75ch; font-size: 15px; line-height: 1.5; }
+
+    .grid-2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    @media (max-width: 980px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--white); border: 1px solid var(--rule); border-radius: 8px;
+      padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px;
+    }
+    .card h3 { font-family: var(--serif); margin: 0 0 12px; font-size: 20px; color: var(--navy); }
+
+    .kpi b { font-family: var(--serif); font-size: 32px; display: block; color: var(--navy); }
+    .kpi span { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 999px; font-weight: 700;
+    }
+    .chip.ok { background: #e4f2ea; color: var(--green-d); }
+    .chip.bad { background: #f8e4df; color: var(--danger); }
+    .chip.warn { background: #f8efd4; color: var(--warn); }
+    .chip.muted { background: #eeeae2; color: #5a534a; }
+    .chip.info { background: #e4ebf5; color: var(--navy-2); }
+
+    .table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .table th { text-align: left; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+    .table td { padding: 12px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+    .table tr:hover td { background: #f5efe6; }
+    .mono { font-family: var(--mono); font-size: 12px; }
+
+    /* ---------- photo scanner lab ---------- */
+    .photo-lab {
+      background: var(--white); border: 1px solid var(--rule); border-radius: 10px;
+      padding: 24px; box-shadow: var(--shadow);
+    }
+    .steps-row { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+    .step-pill {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 999px; background: #efe8dc;
+      font-size: 13px; font-weight: 600;
+    }
+    .step-pill .n {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--navy); color: #f7f0e4;
+      display: grid; place-items: center; font-size: 12px; font-family: var(--mono);
+    }
+    .step-pill.ready { background: #e4f2ea; color: var(--green-d); }
+    .step-pill.ready .n { background: var(--green); }
+    .dropzone {
+      border: 2px dashed var(--gold);
+      background: repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(184,137,58,0.05) 10px, rgba(184,137,58,0.05) 11px), #fffdf8;
+      padding: 32px 20px; text-align: center; border-radius: 8px; min-height: 240px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .dropzone.hot { border-color: var(--saffron); background: #fff4e8; }
+    .dropzone.has-file { border-style: solid; border-color: var(--green); background: #f3faf6; }
+    .dropzone input[type=file] { display: none; }
+    .preview-frame { width: 100%; max-height: 280px; object-fit: contain; border-radius: 6px; background: #111; margin-bottom: 12px; }
+    .fname { font-family: var(--mono); font-size: 12px; color: var(--navy-2); margin-bottom: 8px; }
+
+    .scan-stage {
+      position: relative; min-height: 280px; background: #0b1220; color: #d7f7e3;
+      border-radius: 8px; overflow: hidden; display: grid; place-items: center; padding: 20px;
+    }
+    .scan-stage img { max-width: 100%; max-height: 280px; object-fit: contain; opacity: 0.9; border-radius: 4px; }
+    .scanline {
+      position: absolute; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, transparent, #3dff9a, transparent);
+      animation: sweep 2s linear infinite; box-shadow: 0 0 16px #3dff9a;
+    }
+    @keyframes sweep { from { top: 5%; } to { top: 95%; } }
+    .steps { list-style: none; padding: 0; margin: 0; }
+    .steps li { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; align-items: center; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; flex: none; }
+    .dot.on { background: var(--saffron); }
+    .dot.ok { background: var(--green); }
+    .dot.bad { background: var(--danger); }
+
+    .verdict-hero { padding: 24px; border-radius: 8px; color: #fff; margin-bottom: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+    .verdict-hero.GENUINE, .verdict-hero.COMPLIANT { background: linear-gradient(135deg, #0e4a2e, #1a6b45); }
+    .verdict-hero.THIRD_PARTY, .verdict-hero.NON_COMPLIANT { background: linear-gradient(135deg, #6d1c12, #9c2b1a); }
+    .verdict-hero.INCONCLUSIVE, .verdict-hero.EXPIRED { background: linear-gradient(135deg, #5a4710, #9a6b12); }
+    .verdict-hero h2 { font-family: var(--serif); margin: 0 0 6px; font-size: 28px; }
+    .verdict-hero p { margin: 0; opacity: 0.95; font-size: 15px; }
+
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 6px; color: var(--muted); font-weight: 700; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 12px; border: 1px solid var(--rule); background: #fff;
+      border-radius: 6px; outline: none; font-size: 14px;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,137,58,0.15); }
+    .err { background: #f8e4df; color: var(--danger); padding: 12px 16px; border-radius: 6px; margin-bottom: 14px; font-size: 14px; border-left: 4px solid var(--danger); }
+
+    /* ---------- chat bot widget ---------- */
+    .chatbot-widget {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999; font-family: var(--sans);
+    }
+    .chatbot-toggle {
+      width: 58px; height: 58px; border-radius: 50%; background: var(--navy); color: var(--gold-s);
+      border: 2px solid var(--gold); box-shadow: 0 10px 30px rgba(31,58,95,0.2); display: grid; place-items: center; font-size: 24px; cursor: pointer; transition: transform 0.2s;
+    }
+    .chatbot-toggle:hover { transform: scale(1.08); }
+    .chatbot-box {
+      position: absolute; bottom: 74px; right: 0; width: 380px; height: 520px; background: var(--white);
+      border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); display: none; flex-direction: column; overflow: hidden;
+    }
+    .chatbot-box.open { display: flex; }
+    .chatbot-header {
+      background: var(--navy); color: #f7f0e4; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; font-family: var(--serif); font-size: 16px;
+    }
+    .chatbot-messages { flex: 1; padding: 16px; overflow-y: auto; background: var(--paper); display: flex; flex-direction: column; gap: 12px; }
+    .chat-msg { max-width: 85%; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; }
+    .chat-msg.bot { background: #fff; border: 1px solid var(--rule); align-self: flex-start; color: var(--ink); }
+    .chat-msg.user { background: var(--navy); color: #fff; align-self: flex-end; }
+    .chatbot-input-area { padding: 12px; background: #fff; border-top: 1px solid var(--rule); display: flex; gap: 8px; }
+    .chatbot-input-area input { flex: 1; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; outline: none; font-size: 14px; }
+    .chatbot-input-area button { background: var(--saffron); color: #fff; border: none; width: 42px; height: 42px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; transition: background 0.15s; }
+    .chatbot-input-area button:hover { background: #c86216; }
+
+    .mobile-nav {
+      display: none; position: sticky; top: 4px; z-index: 40; background: var(--navy); padding: 8px;
+      gap: 6px; overflow: auto;
+    }
+    @media (max-width: 920px) {
+      .mobile-nav { display: flex; }
+      .main { padding: 16px; }
+    }
+    .tiny { font-size: 12px; color: var(--muted); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .mt { margin-top: 16px; }
+    .mb { margin-bottom: 16px; }
+    .right { margin-left: auto; }
+    .ok-text { color: var(--green-d); }
+    .bad-text { color: var(--danger); }
+    .warn-text { color: var(--warn); }
+    .progress { height: 8px; background: #e8e0d4; border-radius: 99px; overflow: hidden; margin-top: 6px; }
+    .progress > span { display: block; height: 100%; background: var(--green); }
+  
+    /* Refined Scan & Verify page */
+    .scan-page{position:relative}
+    .scan-trustbar{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr 1fr;gap:0;border:1px solid #e5dfd5;background:#fff;border-radius:14px;margin:8px 0 28px;box-shadow:0 8px 24px rgba(31,26,20,.05);overflow:hidden}
+    .scan-trustitem{padding:15px 18px;border-right:1px solid #ece7df;display:flex;gap:12px;align-items:center}
+    .scan-trustitem:last-child{border-right:0}.scan-trusticon{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#edf3f9;color:var(--navy);font-size:17px;flex:0 0 auto}.scan-trustitem b{display:block;font-size:13px;color:var(--navy)}.scan-trustitem span{display:block;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35}
+    .scan-heading-row{display:grid;grid-template-columns:1fr 420px;gap:34px;align-items:end;margin-bottom:24px}.scan-heading-row h1{margin-bottom:8px}.scan-heading-row .intro{margin-bottom:0;max-width:760px}
+    .scan-how{border:1px solid #e3ddd4;background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 8px 24px rgba(31,26,20,.04)}.scan-how h3{margin:0 0 14px;font-family:var(--serif);color:var(--navy);font-size:20px}.scan-how-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:start}.scan-how-step{display:flex;gap:9px}.scan-how-num{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#dbe9f8;color:var(--navy);font-weight:800;font-size:12px;flex:0 0 auto}.scan-how-step b{font-size:13px;color:var(--navy)}.scan-how-step span{display:block;font-size:11px;color:var(--muted);line-height:1.45;margin-top:3px}.scan-how-arrow{font-size:22px;color:#8b8175;padding-top:1px}
+    .scan-workspace{border:1px solid #dfd9d0;background:#fff;border-radius:16px;padding:22px;box-shadow:0 14px 36px rgba(31,26,20,.07)}
+    .scan-work-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.9fr);gap:22px}.scan-main{min-width:0}.scan-side{display:flex;flex-direction:column;gap:14px}
+    .scan-side-card{border:1px solid #ddd9d2;border-radius:13px;padding:16px;background:#fff}.scan-side-card h3{font-family:var(--serif);color:var(--navy);font-size:18px;margin:0 0 12px}.scan-preview{height:235px;border:1px solid #ccd5df;border-radius:11px;background:linear-gradient(145deg,#f7f9fb,#eef2f6);display:grid;place-items:center;text-align:center;overflow:hidden;position:relative}.scan-preview-placeholder{color:#193c64;font-size:12px;max-width:180px}.scan-preview-placeholder .preview-icon{width:48px;height:48px;border-radius:12px;background:#e5edf6;display:grid;place-items:center;margin:0 auto 10px;font-size:23px}.scan-preview img{width:100%;height:100%;object-fit:contain;background:#eef2f6}.scan-tips{list-style:none;padding:0;margin:0}.scan-tips li{font-size:12px;color:#51493f;margin:9px 0;display:flex;gap:9px;line-height:1.4}.scan-tips li:before{content:'✓';width:18px;height:18px;border-radius:50%;background:#e4f2ea;color:var(--green-d);display:grid;place-items:center;font-weight:800;flex:0 0 auto}
+    .scan-dropzone{min-height:310px;border:1.5px dashed #c89a52!important;border-radius:13px!important;background:repeating-linear-gradient(135deg,#fff 0,#fff 9px,#fcfaf7 9px,#fcfaf7 11px)!important;display:grid;place-items:center;padding:28px!important;text-align:center}.scan-dropzone .upload-icon{width:66px;height:66px;border-radius:50%;background:#fff0e3;color:var(--saffron);display:grid;place-items:center;margin:0 auto 14px;font-size:30px}.scan-dropzone h3{font-family:var(--serif);color:var(--navy);font-size:21px;margin:0 0 7px}.scan-dropzone p{margin:0;color:var(--muted);font-size:12px}.scan-buttons{display:flex;justify-content:center;gap:12px;margin-top:18px;flex-wrap:wrap}.scan-samples{margin-top:14px}.scan-samples .linkish{padding:7px 12px;border:1px solid #e1ddd6;border-radius:999px;background:#fff;margin-left:5px}
+    .scan-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.scan-fields .field{margin:0}.scan-check{margin-top:15px!important;font-size:14px!important;padding:13px 16px!important}
+    .scan-footer{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:0;border:1px solid #e3ddd4;border-radius:14px;background:#fff;margin-top:16px;overflow:hidden}.scan-footer-item{padding:16px 20px;border-right:1px solid #ece7df;display:flex;gap:12px}.scan-footer-item:last-child{border-right:0}.scan-footer-item b{font-size:13px;color:var(--navy)}.scan-footer-item p{font-size:11px;color:var(--muted);margin:4px 0 0;line-height:1.45}.scan-footer-icon{font-size:21px;color:var(--navy)}
+    /* Centered scan workspace */
+    .scan-workspace .steps-row{justify-content:center}
+    .scan-workspace .scan-work-grid{grid-template-columns:minmax(0,920px);justify-content:center}
+    .scan-workspace .scan-main{width:100%;min-width:0}
+    .scan-stage{height:235px!important;border-radius:11px!important;background:#eef2f6!important;border:1px solid #ccd5df!important;display:grid;place-items:center;position:relative;overflow:hidden}.scan-stage img{max-height:100%;max-width:100%;object-fit:contain}.scan-stage .scanline{position:absolute;left:0;right:0;top:45%;height:2px;background:var(--saffron);box-shadow:0 0 14px rgba(224,112,32,.55);animation:scanline 1.6s linear infinite}@keyframes scanline{0%{top:15%}100%{top:85%}}
+    @media(max-width:1050px){.scan-trustbar{grid-template-columns:1fr 1fr 1fr}.scan-trustitem:first-child{grid-column:1/-1}.scan-heading-row{grid-template-columns:1fr}.scan-work-grid{grid-template-columns:1fr}.scan-side{display:grid;grid-template-columns:1fr 1fr}.scan-footer{grid-template-columns:1fr}.scan-footer-item{border-right:0;border-bottom:1px solid #ece7df}.scan-footer-item:last-child{border-bottom:0}}
+    @media(max-width:650px){.scan-trustbar{grid-template-columns:1fr}.scan-trustitem:first-child{grid-column:auto}.scan-workspace{padding:14px}.scan-fields{grid-template-columns:1fr}.scan-side{display:flex}.scan-how-grid{grid-template-columns:1fr}.scan-how-arrow{display:none}}
+
+  
+    .ocr-panel{margin:0 18px 14px;padding:12px;border:1px solid #e4e0d9;border-radius:12px;background:#faf9f6}
+    .ocr-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+    .ocr-head b{display:block;font-size:13px;color:var(--navy)}
+    .ocr-head div span{display:block;font:600 9px var(--mono);letter-spacing:.1em;color:var(--saffron);margin-top:2px}
+    #ocr-text{width:100%;box-sizing:border-box;border:1px solid #ddd6cb;border-radius:8px;padding:8px;font:12px/1.5 var(--mono);background:#fff;color:var(--ink);resize:vertical}
+    .ocr-fields{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+    .ocr-field{padding:7px 8px;background:#fff;border:1px solid #eee8de;border-radius:8px}
+    .ocr-field small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}
+    .ocr-field b{font-size:11px;word-break:break-word}
+    @media(max-width:600px){.ocr-fields{grid-template-columns:1fr}}
+    /* Direct QR scanner */
+    .scanner-dialog{max-width:560px}
+    .scanner-preview-wrap{aspect-ratio:1/1;max-height:70vh;background:#070d16}
+    .scanner-preview-wrap video{object-fit:cover}
+    .scanner-overlay{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+    .scanner-corners{width:58%;aspect-ratio:1;border:2px solid rgba(255,255,255,.9);border-radius:18px;box-shadow:0 0 0 999px rgba(0,0,0,.22)}
+    .scanner-line{position:absolute;width:54%;height:2px;background:var(--saffron);box-shadow:0 0 12px rgba(224,112,32,.7);animation:scannerSweep 1.8s ease-in-out infinite}
+    @keyframes scannerSweep{0%,100%{transform:translateY(-115px)}50%{transform:translateY(115px)}}
+    .scanner-dialog .camera-actions{justify-content:center}
+    @media(prefers-reduced-motion:reduce){.scanner-line{animation:none}}
+    /* Live camera modal */
+    .camera-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(15,22,32,.72);backdrop-filter:blur(5px)}
+    .camera-modal.open{display:flex}
+    .camera-dialog{width:min(720px,96vw);background:var(--paper);border:1px solid rgba(31,26,20,.14);border-radius:20px;box-shadow:0 28px 80px rgba(0,0,0,.3);overflow:hidden}
+    .camera-dialog-head{display:flex;justify-content:space-between;gap:20px;padding:22px 24px 16px}
+    .camera-dialog-head h2{margin:3px 0 4px;font-family:var(--serif);font-size:28px;color:var(--navy)}
+    .camera-dialog-head p{margin:0;color:var(--muted);font-size:14px}
+    .camera-kicker{font:600 11px/1 var(--mono);letter-spacing:.16em;color:var(--saffron)}
+    .camera-close{border:0;background:transparent;font-size:32px;line-height:1;color:var(--muted);cursor:pointer;padding:0 4px}
+    .camera-preview-wrap{position:relative;margin:0 24px;background:#0b1422;border-radius:14px;overflow:hidden;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center}
+    #camera-video{width:100%;height:100%;object-fit:cover;display:block;background:#0b1422}
+    .camera-frame{position:absolute;inset:13%;border:2px solid rgba(255,255,255,.82);border-radius:14px;pointer-events:none;box-shadow:0 0 0 999px rgba(0,0,0,.16)}
+    .camera-frame span{position:absolute;inset:-2px;border:1px dashed rgba(255,255,255,.55);border-radius:14px}
+    .camera-status{position:absolute;left:14px;bottom:14px;background:rgba(8,16,28,.76);color:#fff;border-radius:999px;padding:7px 11px;font:500 11px var(--mono)}
+    .camera-actions{display:flex;justify-content:flex-end;gap:10px;padding:18px 24px 22px}
+    @media(max-width:600px){.camera-dialog-head{padding:18px}.camera-preview-wrap{margin:0 18px}.camera-actions{padding:14px 18px 18px}.camera-dialog-head h2{font-size:24px}}
+
+    /* ---------- GATC dashboard · redesigned admin workspace ---------- */
+    .gatc-shell{grid-template-columns:255px 1fr!important;min-height:calc(100vh - 4px);background:#f5f7fa}
+    .gatc-shell .gatc-side{
+      background:#0b2b52;color:#e8eef7;padding:0;display:flex;flex-direction:column;
+      border-right:1px solid rgba(255,255,255,.08);min-height:calc(100vh - 4px)
+    }
+    .gatc-side-brand{height:92px;padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.1)}
+    .gatc-side-brand .brand-emblem{width:46px;height:46px;background:#fff;color:#b8893a;border:1px solid #b8893a;box-shadow:none}
+    .gatc-side-brand .nm{font-family:var(--serif);font-size:21px;font-weight:720;color:#fff;letter-spacing:.04em}
+    .gatc-side-brand .sub{font-size:9px;letter-spacing:.04em;color:#b7c4d6;text-transform:none;margin-top:2px}
+    .gatc-nav{padding:14px 10px;display:flex;flex-direction:column;gap:4px}
+    .gatc-shell .gatc-nav .navbtn{
+      min-height:54px;text-align:left;background:transparent;border:0;color:#dce7f5;
+      padding:8px 12px;border-radius:8px;display:flex;gap:12px;align-items:center;
+      font-size:13px;font-weight:600;width:100%;transition:.15s
+    }
+    .gatc-shell .gatc-nav .navbtn:hover{background:rgba(255,255,255,.07);color:#fff}
+    .gatc-shell .gatc-nav .navbtn.active{background:#173f70;color:#fff;box-shadow:inset 3px 0 0 #2e79d6}
+    .gatc-nav-icon{width:28px;height:28px;border:1px solid rgba(255,255,255,.28);border-radius:6px;display:grid;place-items:center;font-size:14px;flex:0 0 auto}
+    .gatc-shell .gatc-nav .navbtn.active .gatc-nav-icon{background:#245487;border-color:#4c83bd}
+    .gatc-shell .gatc-nav .navbtn small{display:block;color:#91a5bd;font-weight:400;font-size:10px;margin-top:2px}
+    .gatc-shell .gatc-nav .navbtn.active small{color:#b9cbe0}
+    .gatc-side-bottom{margin-top:auto;padding:12px 10px 14px;border-top:1px solid rgba(255,255,255,.08)}
+    .gatc-side-user{display:flex;gap:10px;align-items:center;padding:10px 8px 12px}
+    .gatc-avatar{width:34px;height:34px;border-radius:50%;background:#dce8f5;color:#163b65;display:grid;place-items:center;font-weight:800}
+    .gatc-side-user b{display:block;color:#fff;font-size:12px}.gatc-side-user span{color:#91a5bd;font-size:10px}
+    .gatc-signout{width:100%;border:0;background:rgba(255,255,255,.07);color:#dce7f5;border-radius:7px;padding:9px;font-size:12px}
+    .gatc-shell .gatc-content{min-width:0}
+    .gatc-header{height:92px;background:#fff;border-bottom:1px solid #e2e7ed;display:flex;align-items:center;justify-content:space-between;padding:0 30px}
+    .gatc-header-brand{display:flex;align-items:center;gap:10px}
+    .gatc-header-brand .brand-emblem{width:42px;height:42px;background:#fff;color:#b8893a;border:0;box-shadow:none}
+    .gatc-header-brand .nm{font-family:var(--serif);font-size:20px;color:#173b67;font-weight:720}
+    .gatc-header-brand .sub{font-size:10px;color:#6e7b8d;margin-top:1px}
+    .gatc-header-right{display:flex;align-items:center;gap:18px}
+    .gatc-header-bell{position:relative;width:40px;height:40px;display:grid;place-items:center;border:0;background:transparent;color:#173b67;font-size:20px}
+    .gatc-header-badge{position:absolute;right:2px;top:1px;min-width:17px;height:17px;padding:0 4px;border-radius:10px;background:#e65b4d;color:#fff;font-size:9px;display:grid;place-items:center}
+    .gatc-account{display:flex;align-items:center;gap:10px;padding-left:16px;border-left:1px solid #e3e7ec}
+    .gatc-account .gatc-avatar{width:40px;height:40px;background:#173b67;color:#fff}
+    .gatc-account b{display:block;color:#162b47;font-size:13px}.gatc-account span{display:block;color:#6f7d8f;font-size:10px;margin-top:2px}
+    .gatc-account .chev{font-size:14px;color:#173b67;margin-left:4px}
+    .gatc-main{padding:28px 30px 42px;background:#f6f8fb;min-height:calc(100vh - 96px)}
+    .gatc-page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:24px}
+    .gatc-page-head h1{font-family:var(--sans);font-weight:700;font-size:30px;letter-spacing:-.02em;margin:0;color:#173b67}
+    .gatc-page-head p{margin:5px 0 0;color:#66758a;font-size:14px}
+    .gatc-date{background:#fff;border:1px solid #e0e6ed;border-radius:9px;padding:11px 15px;color:#56667a;font-size:12px;white-space:nowrap;box-shadow:0 3px 10px rgba(20,45,75,.03)}
+    .gatc-kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:22px}
+    .gatc-kpi-card{background:#fff;border:1px solid #e0e6ed;border-radius:11px;padding:17px 18px;min-height:112px;position:relative;overflow:hidden;box-shadow:0 4px 14px rgba(18,47,79,.035)}
+    .gatc-kpi-card .kpi-icon{width:34px;height:34px;border-radius:8px;background:#edf4fc;color:#1d67b4;display:grid;place-items:center;font-size:18px;margin-bottom:8px}
+    .gatc-kpi-card b{display:block;font-size:27px;line-height:1;color:#173b67;margin-bottom:6px}
+    .gatc-kpi-card span{display:block;color:#5f6e80;font-size:11px;font-weight:700}
+    .gatc-kpi-card small{display:block;color:#8995a5;font-size:10px;margin-top:4px}
+    .gatc-kpi-card.warn .kpi-icon{background:#fff4df;color:#d48a00}.gatc-kpi-card.warn b{color:#222}
+    .gatc-kpi-card.ok .kpi-icon{background:#e8f7ef;color:#23935b}.gatc-kpi-card.ok b{color:#174d38}
+    .gatc-kpi-card.purple .kpi-icon{background:#f1eafd;color:#6842a0}.gatc-kpi-card.purple b{color:#4e3280}
+    .gatc-kpi-card.danger .kpi-icon{background:#fff0ee;color:#dc4f43}.gatc-kpi-card.danger b{color:#c63e35}
+    .gatc-two-col{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,.95fr);gap:20px;margin-bottom:20px}
+    .gatc-panel{background:#fff;border:1px solid #e0e6ed;border-radius:11px;box-shadow:0 4px 14px rgba(18,47,79,.035);overflow:hidden}
+    .gatc-panel-head{padding:17px 18px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .gatc-panel-head h3{margin:0;color:#173b67;font-family:var(--sans);font-size:17px;font-weight:700}
+    .gatc-link{border:0;background:transparent;color:#1665bd;font-size:11px;font-weight:700;cursor:pointer}
+    .gatc-table-wrap{overflow:auto;padding:0 12px 10px}
+    .gatc-table{width:100%;border-collapse:collapse;font-size:11px;min-width:620px}
+    .gatc-table th{text-align:left;color:#758398;font-size:9px;text-transform:uppercase;letter-spacing:.07em;padding:9px 8px;border-bottom:1px solid #e7ebf0}
+    .gatc-table td{padding:11px 8px;border-bottom:1px solid #edf0f3;color:#28384d;vertical-align:middle}
+    .gatc-table tr:last-child td{border-bottom:0}.gatc-table .mono{font-size:10px;color:#314a68}
+    .gatc-status{display:inline-flex;align-items:center;border-radius:6px;padding:4px 8px;font-size:9px;font-weight:700}
+    .gatc-status.scheduled,.gatc-status.in_progress{background:#e8f1ff;color:#1765bd}
+    .gatc-status.pending{background:#fff3db;color:#bd7700}.gatc-status.completed{background:#e6f6ed;color:#237c50}
+    .gatc-status.failed{background:#ffebe8;color:#c23e35}
+    .gatc-schedule-list{padding:0 12px 12px}
+    .gatc-schedule-item{display:grid;grid-template-columns:72px 1fr auto;gap:12px;padding:13px 8px;border-top:1px solid #edf0f3;align-items:start}
+    .gatc-time{background:#edf4fc;color:#1c5fa7;border-radius:6px;padding:7px 5px;text-align:center;font-weight:800;font-size:10px}
+    .gatc-schedule-item b{font-size:12px;color:#263950}.gatc-schedule-item p{margin:4px 0 0;font-size:10px;color:#738095;line-height:1.4}
+    .gatc-bottom-grid{display:grid;grid-template-columns:minmax(260px,.7fr) minmax(0,1.3fr);gap:20px}
+    .gatc-summary{padding:18px;display:flex;align-items:center;gap:24px;min-height:155px}
+    .gatc-donut{width:110px;height:110px;border-radius:50%;background:conic-gradient(#2eaa6d 0 82%,#e95a50 82% 88%,#a5acb5 88% 100%);position:relative;flex:0 0 auto}
+    .gatc-donut:after{content:"";position:absolute;inset:22px;background:#fff;border-radius:50%}
+    .gatc-legend{display:flex;flex-direction:column;gap:9px}.gatc-legend div{font-size:11px;color:#526175}.gatc-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;background:#2eaa6d}.gatc-legend .fail i{background:#e95a50}.gatc-legend .pend i{background:#a5acb5}.gatc-legend b{float:right;margin-left:18px;color:#263950}
+    .gatc-actions{padding:18px}.gatc-action-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .gatc-action-card{border:1px solid #e1e7ed;border-radius:9px;padding:14px;background:#fff;cursor:pointer;text-align:left;min-height:100px}
+    .gatc-action-card:hover{border-color:#9bbde2;background:#f8fbff}
+    .gatc-action-card .aicon{font-size:20px;color:#173b67;margin-bottom:11px}.gatc-action-card b{display:block;color:#173b67;font-size:11px}.gatc-action-card span{display:block;color:#7b8797;font-size:9px;margin-top:4px;line-height:1.35}
+    .gatc-shell .mobile-nav{display:none}
+    .gatc-check-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.gatc-check-item{border:1px solid #e1e7ed;border-radius:9px;padding:11px;background:#fff}.gatc-check-item label{display:block;font-size:10px;color:#66758a;font-weight:700;margin-bottom:6px}.gatc-check-item select{width:100%;padding:8px;border:1px solid #e1e7ed;border-radius:6px;background:#fff}@media(max-width:650px){.gatc-check-grid{grid-template-columns:1fr}}
+    @media(max-width:1100px){.gatc-kpi-grid{grid-template-columns:repeat(3,1fr)}.gatc-two-col,.gatc-bottom-grid{grid-template-columns:1fr}}
+    @media(max-width:800px){.gatc-shell{grid-template-columns:1fr!important}.gatc-shell .gatc-side{display:none}.gatc-header{padding:0 16px}.gatc-header-brand{display:none}.gatc-main{padding:20px 16px}.gatc-page-head{flex-direction:column}.gatc-kpi-grid{grid-template-columns:1fr 1fr}.gatc-action-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:520px){.gatc-kpi-grid{grid-template-columns:1fr}.gatc-account>div:not(.gatc-avatar){display:none}.gatc-action-grid{grid-template-columns:1fr}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+  <!-- Direct QR scanner modal -->
+  <div id="camera-modal" class="camera-modal" aria-hidden="true">
+    <div class="camera-dialog scanner-dialog">
+      <div class="camera-dialog-head">
+        <div>
+          <div class="camera-kicker">PRAMĀṆA SCANNER</div>
+          <h2>Scan QR Code</h2>
+          <p>Point your camera at the instrument certificate QR.</p>
+        </div>
+        <button type="button" class="camera-close" onclick="closeCamera()" aria-label="Close scanner">×</button>
+      </div>
+
+      <div class="camera-preview-wrap scanner-preview-wrap">
+        <video id="camera-video" autoplay playsinline muted></video>
+        <div class="scanner-overlay" aria-hidden="true">
+          <div class="scanner-corners"></div>
+          <div class="scanner-line"></div>
+        </div>
+        <div id="camera-status" class="camera-status">Starting scanner…</div>
+      </div>
+
+      <div id="ocr-panel" class="ocr-panel" style="display:none;">
+        <div class="ocr-head">
+          <div><b>Text detected</b><span>PRAMĀṆA OCR</span></div>
+          <span id="ocr-status" class="tiny">Reading nameplate…</span>
+        </div>
+        <textarea id="ocr-text" rows="4" readonly placeholder="Detected text will appear here"></textarea>
+        <div id="ocr-fields" class="ocr-fields"></div>
+      </div>
+
+      <div class="camera-actions">
+        <label class="btn btn-navy" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          ↥ &nbsp; Choose QR Image
+          <input id="camera-fallback-file" type="file" accept="image/*" style="display:none;">
+        </label>
+        <button type="button" class="btn btn-navy" onclick="closeCamera()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tri"></div>
+  <div id="app"></div>
+
+  <!-- Pramana Sahayak AI Chatbot Widget -->
+  <div class="chatbot-widget">
+    <div class="chatbot-box" id="chatbot-box">
+      <div class="chatbot-header">
+        <span>🏛️ Pramāṇa Sahayak AI</span>
+        <button onclick="toggleChat()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">×</button>
+      </div>
+      <div class="chatbot-messages" id="chatbot-messages">
+        <div class="chat-msg bot">Namaste! I am Pramāṇa Sahayak 🏛️. Ask me anything about weighing instrument verification, OIML MPE tolerances, or Legal Metrology rules.</div>
+      </div>
+      <div class="chatbot-input-area">
+        <input id="chat-input" placeholder="Ask about verification, fees, MPE..." onkeypress="if(event.key==='Enter')sendChatMessage()" />
+        <button onclick="sendChatMessage()" title="Send Message">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+    </div>
+    <div class="chatbot-toggle" onclick="toggleChat()" title="Pramana Sahayak AI">💬</div>
+  </div>
+
+  <script>
+    const $ = function(sel, el) { return (el || document).querySelector(sel); };
+    const app = $("#app");
+
+    const S = {
+      user: null,
+      view: "landing",
+      payload: {},
+      cache: {},
+      navActive: 0,
+    };
+
+    const TYPE_LABEL = {
+      electronic_weighing: "Electronic weighing instrument",
+      platform_scale: "Platform scale",
+      weighbridge: "Weighbridge",
+      fuel_dispenser: "Fuel dispenser",
+      beam_scale: "Beam scale",
+      counter_machine: "Counter machine",
+      load_cell: "Load cell",
+      tape: "Tape measure",
+      storage_tank: "Storage tank",
+      taxi_meter: "Taxi / auto meter",
+      water_meter: "Water meter",
+    };
+
+    const DB = {
+      gatcs: [
+        { id: 21, code: "GATC-021", name: "ABC Legal Metrology Verification Centre", organization: "ABC Compliance Services Pvt. Ltd.", location: "Lucknow, Uttar Pradesh", district: "Lucknow", state: "Uttar Pradesh", contact: "+91-98765-21021", status: "active", approval_date: "2026-01-15", valid_until: "2027-12-31", authorized: ["CNG Dispenser", "LPG Dispenser", "Petrol/Diesel Dispenser", "Platform Scale", "Weighbridge"], equipment: ["Master Prover", "Standard Test Weights", "Flow Test Rig"], workload: "Low", availability: "Available", capacity: 40, completed: 124, failed: 5, avg_days: 2.1, staff: 8 },
+        { id: 34, code: "GATC-034", name: "North UP Verification Lab", organization: "North UP Testing Services", location: "Lucknow, Uttar Pradesh", district: "Lucknow", state: "Uttar Pradesh", contact: "+91-98765-34034", status: "active", approval_date: "2025-09-01", valid_until: "2027-08-31", authorized: ["CNG Dispenser", "LPG Dispenser", "Platform Scale"], equipment: ["Standard Test Weights", "Electrical Test Bench"], workload: "High", availability: "Limited", capacity: 30, completed: 98, failed: 8, avg_days: 3.4, staff: 6 },
+        { id: 41, code: "GATC-041", name: "Central Instrument Test Centre", organization: "Central Metrology Services", location: "Kanpur Nagar, Uttar Pradesh", district: "Kanpur Nagar", state: "Uttar Pradesh", contact: "+91-98765-41041", status: "active", approval_date: "2026-02-10", valid_until: "2028-02-09", authorized: ["CNG Dispenser", "Petrol/Diesel Dispenser", "Weighbridge"], equipment: ["Flow Test Rig", "Master Prover", "Calibrated Weights"], workload: "Medium", availability: "Available", capacity: 35, completed: 76, failed: 2, avg_days: 1.8, staff: 7 }
+      ],
+      instruments: [
+        { id: 1, serial: "LM-UP-000127", name: "Sharma Kirana Platform Scale", type: "platform_scale", accuracy_class: "III", max_kg: 300, e_value: 0.1, manufacturer: "Essae", model: "DS-852", model_approval: "IND/09/2019/214", premises: "Sharma Stores, Hazratganj", district: "Lucknow", state: "Uttar Pradesh", status: "verified", oem_status: "genuine", stamp_lmo: "LMO-LKO-01", stamp_year: "2026", stamp_quarter: "A", last_verified: "2026-01-12", next_due: "2027-01-12", lat: 26.8467, lng: 80.9462, compliance: { verdict: "COMPLIANT", score: 95, passed: ["Model approval valid", "Seals intact", "Within MPE tolerance", "Genuine OEM parts"], issues: [], rules_applied: ["Legal Metrology Act s.24", "OIML R 76"] } },
+        { id: 2, serial: "LM-UP-000431", name: "Bharat Fuels Dispenser #3", type: "fuel_dispenser", accuracy_class: "0.5", max_kg: 50, e_value: 0.01, manufacturer: "Gilbarco", model: "Prime-S", model_approval: "IND/12/2021/88", premises: "Bharat Petroleum, Aliganj", district: "Lucknow", state: "Uttar Pradesh", status: "expired", oem_status: "third_party", stamp_lmo: "LMO-LKO-02", stamp_year: "2024", stamp_quarter: "C", last_verified: "2024-06-15", next_due: "2025-06-15", lat: 26.8917, lng: 80.9502, compliance: { verdict: "NON_COMPLIANT", score: 42, passed: ["Model approval active"], issues: ["Verification overdue", "Third-party flow meter detected", "Error exceeds MPE (+1.4e)"], rules_applied: ["OIML R 117", "Rule 27"] } },
+        { id: 3, serial: "LM-UP-000821", name: "Kanpur Central Weighbridge", type: "weighbridge", accuracy_class: "III", max_kg: 50000, e_value: 10.0, manufacturer: "TCS Scales", model: "WB-50T", model_approval: "IND/05/2020/11", premises: "New Bharat Freight Carrier, Transport Nagar", district: "Kanpur Nagar", state: "Uttar Pradesh", status: "verified", oem_status: "genuine", stamp_lmo: "LMO-KNP-04", stamp_year: "2026", stamp_quarter: "B", last_verified: "2026-03-10", next_due: "2028-03-10", lat: 26.4499, lng: 80.3319, compliance: { verdict: "COMPLIANT", score: 92, passed: ["Load cell genuine C3 class", "Weighbridge zero-tracking verified"], issues: [], rules_applied: ["Legal Metrology Act s.24", "OIML R 60"] } },
+        { id: 4, serial: "LM-VBN-99102", name: "Kashi Wholesale Counter Scale", type: "counter_machine", accuracy_class: "II", max_kg: 15, e_value: 0.002, manufacturer: "Phoenix", model: "Avery-15", model_approval: "IND/09/2022/45", premises: "Varanasi Mandi Traders", district: "Varanasi", state: "Uttar Pradesh", status: "verified", oem_status: "genuine", stamp_lmo: "LMO-VBN-01", stamp_year: "2026", stamp_quarter: "A", last_verified: "2026-02-01", next_due: "2027-02-01", lat: 25.3176, lng: 82.9739, compliance: { verdict: "COMPLIANT", score: 98, passed: ["All checks passed"], issues: [], rules_applied: ["OIML R 76"] } }
+      ],
+      applications: [
+        { id: 101, public_id: "APP-2026-881", instrument_id: 1, kind: "reverification", status: "verified", applicant_name: "Rajesh Sharma", org: "Sharma Stores", serial: "LM-UP-000127", instrument_name: "Sharma Kirana Platform Scale", district: "Lucknow", submitted_date: "2026-08-10", assigned_officer: "Rahul Sharma (LMO-01)" },
+        { id: 102, public_id: "APP-2026-904", instrument_id: 2, kind: "repair", status: "inspected", applicant_name: "Anil Gupta", org: "Bharat Petroleum", serial: "LM-UP-000431", instrument_name: "Bharat Fuels Dispenser #3", district: "Lucknow", submitted_date: "2026-08-18", assigned_officer: "Priya Verma (LMO-02)" },
+        { id: 103, public_id: "APP-2026-920", instrument_id: 3, kind: "first_verification", status: "submitted", applicant_name: "Manoj Singh", org: "New Bharat Freight Carrier", serial: "LM-UP-000821", instrument_name: "Kanpur Central Weighbridge", district: "Kanpur Nagar", submitted_date: "2026-08-25", assigned_officer: "Unassigned" },
+        { id: 104, public_id: "APP-2026-926", instrument_id: 2, kind: "verification", status: "scheduled", applicant_name: "Anil Gupta", org: "ABC CNG Station", serial: "LM-UP-000431", instrument_name: "Bharat Fuels Dispenser #3", district: "Lucknow", submitted_date: "2026-08-26", assigned_officer: "Rahul Sharma (LMO-01)", gatc_id: 21, schedule: { date: "2026-08-28", time: "11:00", location: "ABC CNG Station, Lucknow", officer: "GATC-021" } }
+      ],
+      complaints: [
+        { id: "CMP-1024", instrument_id: 2, serial: "LM-UP-000431", type: "Incorrect/Short measurement", description: "Dispenser showing 950ml for 1L delivery test.", district: "Lucknow", date: "2026-08-14", priority: "High", status: "Investigating", assigned_officer: "Priya Verma" },
+        { id: "CMP-1025", instrument_id: 1, serial: "LM-UP-000127", type: "Suspected tampering", description: "Lead seal wire was found loose during morning unloading.", district: "Lucknow", date: "2026-08-22", priority: "Medium", status: "New", assigned_officer: "Unassigned" }
+      ],
+      audit: [
+        { ts: "2026-08-26 10:14:22", actor_name: "Rahul Sharma", actor_role: "Officer", action: "VERIFY_PASS", entity: "Instrument #1", entity_id: "LM-UP-000127", chain_hash: "a89f81bc74e90123efab" },
+        { ts: "2026-08-25 14:30:10", actor_name: "Admin Officer", actor_role: "Admin", action: "ASSIGN_INSPECTION", entity: "Application #103", entity_id: "APP-2026-920", chain_hash: "3f9011ab827e4910bcde" }
+      ],
+      notifications: [
+        { id: 1, title: "New Inspection Scheduled", time: "10 mins ago" },
+        { id: 2, title: "Grievance CMP-1024 Assigned", time: "1 hour ago" },
+        { id: 3, title: "System Database Backup Completed", time: "Yesterday" }
+      ]
+    };
+
+    // Backend-backed notification + verification workflow persistence.
+    function saveNotifications() {
+      try {
+        fetch("/api/notifications", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({notifications: DB.notifications.slice(0,50)})}).catch(function(){});
+      } catch(e) {}
+    }
+    function addNotification(role, title, message, icon, view, payload) {
+      DB.notifications.unshift({id: Date.now()+Math.random(), role: role, title: title, message: message, icon: icon||"🔔", view: view||"", payload: payload||{}, time: "Just now", read:false});
+      saveNotifications();
+    }
+    function getNotificationsForCurrentUser() { const role = S.user ? S.user.role : "public"; return DB.notifications.filter(function(n){ return n.role === role || n.role === "all"; }); }
+    function notificationBellHtml() { const count=getNotificationsForCurrentUser().filter(function(n){return !n.read;}).length; return '<div style="position:relative;display:inline-block;"><button class="bell-linkish" onclick="toggleNotifications(event)" title="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>' + (count ? '<span style="position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--danger);color:#fff;font:700 10px/17px Arial;text-align:center;">'+Math.min(count,99)+'</span>' : '') + '</button></div>'; }
+    function markNotificationsRead() { const role=S.user?S.user.role:"public"; DB.notifications.forEach(function(n){if(n.role===role||n.role==="all") n.read=true;}); saveNotifications(); }
+
+    function saveVerificationWorkflow() {
+      try {
+        const workflowApps = DB.applications.filter(function(a) { return a.workflow === "verification"; });
+        fetch("/api/applications/bulk", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({applications:workflowApps})}).catch(function(){});
+      } catch (e) {}
+    }
+
+    function getOwnerApplications() {
+      const ownerId = S.user ? S.user.id : null;
+      return DB.applications.filter(function(a) {
+        return a.workflow === "verification" && (!ownerId || a.owner_id === ownerId);
+      });
+    }
+
+    function verificationTimeline(a) {
+      const status = a.status;
+      const stepMap = { pending: 2, approved: 3, scheduled: 4, completed: 5, payment_pending: 5, payment_paid: 6 };
+      const step = stepMap[status] || 1;
+      const items = [
+        ["Application Submitted", 1],
+        ["Pending Officer Review", 2],
+        ["Approved by Metrology Officer", 3],
+        ["Verification Scheduled", 4],
+        ["Instrument Tested by GATC", 5],
+        ["Payment", 6]
+      ];
+      let html = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">';
+      items.forEach(function(item) {
+        const active = step >= item[1];
+        const current = step === item[1];
+        let label = active ? "Verified" : "Pending";
+        if (item[1] === 5) label = a.gatc_test_result === "pass" ? "PASS" : (a.gatc_test_result === "fail" ? "FAIL" : "Pending");
+        if (item[1] === 6) label = status === "payment_paid" ? "Paid" : (status === "payment_pending" ? "Payment Required" : "Pending");
+        html += '<div class="part"><span>' + (active ? '✓ ' : '○ ') + item[0] + '</span>' + (current ? chip(item[1] === 5 ? (a.gatc_test_result || "pending") : status) : chip(active ? (item[1] === 5 ? (a.gatc_test_result || "verified") : (item[1] === 6 ? (status === "payment_paid" ? "payment_paid" : "payment_pending") : "verified")) : "unknown")) + '</div>';
+      });
+      if (status === "payment_pending" || status === "completed") {
+        html += '<div class="card" style="background:#fff7e6;border:1px solid #ead19b;color:var(--warn);margin-top:6px;"><b>Payment required</b><div class="tiny" style="color:inherit;margin-top:4px;">Your instrument has passed the GATC test. Pay the verification fee to continue processing your application.</div><button class="btn btn-saffron mt" onclick="openVerificationPayment(' + a.id + ')">Pay Verification Fee</button></div>';
+      }
+      if (status === "payment_paid") {
+        html += '<div class="card" style="background:#e4f2ea;color:var(--green-d);margin-top:6px;"><b>Payment received ✓</b><div class="tiny" style="color:inherit;margin-top:4px;">Payment is confirmed. Your application has moved to the next government processing stage.</div></div>';
+      }
+      if (status === "rejected") {
+        html += '<div class="card" style="background:#f8e4df;color:var(--danger);margin-top:6px;"><b>Application Rejected</b><div class="tiny" style="color:inherit;margin-top:4px;">' + (a.rejection_reason || "Officer did not approve this application.") + '</div></div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function chip(status) {
+      const map = {
+        verified: ["ok", "Verified"],
+        pending: ["warn", "Pending"],
+        approved: ["ok", "Approved"],
+        scheduled: ["info", "Scheduled"],
+        rejected: ["bad", "Rejected"],
+        payment_pending: ["warn", "Payment Required"],
+        payment_paid: ["info", "Payment Received"],
+        expired: ["warn", "Expired"],
+        sealed_tampered: ["bad", "Seal tampered"],
+        genuine: ["ok", "Genuine OEM"],
+        third_party: ["bad", "Third-party"],
+        unknown: ["muted", "Unknown"],
+        submitted: ["info", "Submitted"],
+        inspection_scheduled: ["warn", "Inspection scheduled"],
+        pass: ["ok", "Pass"],
+        fail: ["bad", "Fail"],
+        valid: ["ok", "Valid"],
+        due: ["warn", "Due"],
+        COMPLIANT: ["ok", "Compliant"],
+        NON_COMPLIANT: ["bad", "Non-compliant"],
+        EXPIRED: ["warn", "Expired"],
+        GENUINE: ["ok", "Genuine"],
+        THIRD_PARTY: ["bad", "Third-party"],
+        INCONCLUSIVE: ["warn", "Inconclusive"],
+        Valid: ["ok", "Valid"],
+        Expired: ["warn", "Expired"],
+        Investigating: ["warn", "Investigating"],
+        New: ["info", "New"],
+        Resolved: ["ok", "Resolved"]
+      };
+      const pair = map[status] || ["muted", status || "—"];
+      return '<span class="chip ' + pair[0] + '">' + pair[1] + '</span>';
+    }
+
+    async function api(path, opts = {}) {
+      const options = Object.assign({}, opts);
+      options.credentials = "same-origin";
+      if (options.body && !(options.body instanceof FormData) && typeof options.body !== "string") {
+        options.headers = Object.assign({"Content-Type":"application/json"}, options.headers || {});
+        options.body = JSON.stringify(options.body);
+      }
+      const response = await fetch(path, options);
+      let data = {};
+      try { data = await response.json(); } catch (e) {}
+      if (!response.ok) throw new Error(data.error || data.note || ("Request failed: " + response.status));
+      return data;
+    }
+
+    async function persistInstrument(inst) {
+      if (!inst || !inst.id) return;
+      try { await api("/api/instruments/" + inst.id, {method:"PUT", body:inst}); } catch(e) {}
+    }
+
+
+    function go(view, payload, navIndex) {
+      S.view = view;
+      S.payload = payload || {};
+      if (typeof navIndex === "number") S.navActive = navIndex;
+      location.hash = view;
+      render();
+    }
+
+    window.addEventListener("hashchange", function() {
+      const v = location.hash.replace("#", "") || "landing";
+      if (v !== S.view) {
+        S.view = v;
+        render();
+      }
+    });
+
+    function brand() {
+      return '<a class="brand" href="#landing" onclick="event.preventDefault(); logoutHome()"><div class="brand-emblem">⚖️</div><div><div class="nm">PRAMĀṆA</div><div class="sub">प्रमाण · Trusted measure</div></div></a>';
+    }
+
+    function logoutHome() {
+      S.user = null;
+      go("landing");
+    }
+
+    function toggleNotifications(event) {
+      if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+      const existing=document.getElementById("notif-dropdown"); if(existing){existing.remove();return;}
+      const notes=getNotificationsForCurrentUser();
+      let items="";
+      if(!notes.length) items='<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">No notifications</div>';
+      notes.slice(0,8).forEach(function(n){ items += '<button style="display:block;width:100%;text-align:left;border:0;background:'+(n.read?'#fff':'#fbf7ef')+';padding:12px;border-bottom:1px solid #eee;cursor:pointer;" onclick="openNotification(\''+String(n.id).replace(/'/g,"\\'")+ '\',\''+(n.view||'')+'\')"><span style="font-size:17px;margin-right:6px;">'+(n.icon||'🔔')+'</span><b style="color:var(--navy);font-size:13px;">'+n.title+'</b><div style="font-size:12px;color:var(--muted);margin:4px 0 0 25px;line-height:1.4;">'+n.message+'</div><div style="font-size:10px;color:#9a8f84;margin:5px 0 0 25px;">'+n.time+'</div></button>'; });
+      const d=document.createElement("div"); d.id="notif-dropdown"; d.style.cssText="position:absolute;top:50px;right:0;width:340px;max-width:calc(100vw - 30px);background:#fff;border:1px solid var(--rule);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.15);z-index:10000;overflow:hidden;text-align:left;";
+      d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--rule);"><b style="font-size:15px;font-family:var(--serif);color:var(--navy);">Notifications</b><button class="linkish" style="font-size:11px;padding:4px 7px;" onclick="markNotificationsRead();document.getElementById(\'notif-dropdown\').remove();render();">Mark all read</button></div>'+items;
+      const trigger = (event && event.currentTarget) ? event.currentTarget : document.querySelector(".gatc-header-bell, .bell-linkish");
+      if (trigger && trigger.parentElement) trigger.parentElement.appendChild(d);
+      else document.body.appendChild(d);
+      markNotificationsRead();
+    }
+    function openNotification(id, view){ const n=DB.notifications.find(function(x){return String(x.id)===String(id);}); if(n){n.read=true;saveNotifications();} const d=document.getElementById("notif-dropdown");if(d)d.remove(); if(view)go(view,n?n.payload:{}); }
+
+    document.addEventListener("click", function() {
+      const d = document.getElementById("notif-dropdown");
+      if (d) d.remove();
+    });
+
+    function topPublic() {
+      return '<div class="topbar">' + brand() + '<div class="toplinks"><button class="bell-linkish" onclick="toggleNotifications(event)" title="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="bell-badge"></span></button><button class="linkish" onclick="openScanner()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>Scan / Verify</button><button class="linkish" onclick="go(\'guidelines\')">Guidelines</button><button class="linkish" onclick="go(\'login-unified\')" style="background:var(--saffron);color:#fff;border-color:var(--saffron)">Sign In</button></div></div>';
+    }
+
+    function officialGovFooter() {
+      return '<div class="creamy-footer"><div class="creamy-footer-links"><a href="#guidelines">About Us</a> / <a href="#guidelines">Help</a> / <a href="#guidelines">Sitemap</a> / <a href="#guidelines">Website Policies</a> / <a href="#guidelines">Feedback</a> / <a href="#guidelines">Contact Us</a></div><p style="font-size:13px;color:var(--muted);margin:8px 0 0;">Department of Consumer Affairs · Legal Metrology Division · Government of India</p></div>';
+    }
+
+    function landing() {
+      return `<div class="hero">
+        ${topPublic()}
+        <div class="home-hero-grid">
+          <div class="home-copy">
+            <p class="kicker">Department of Consumer Affairs · Legal Metrology</p>
+            <h1 class="display">Is this scale legal for trade — or a third-party clone?</h1>
+            <p class="lede">PRAMĀṆA is the digital verification lifecycle for weighing and measuring instruments — from application and officer review to field inspection, scheduling, QR verification and authenticity checks.</p>
+            <div class="pschip">SIH26036 · Software · Transportation &amp; Logistics</div>
+            <div class="home-actions">
+              <button class="linkish home-primary" onclick="openScanner()">⌕&nbsp; Scan / Verify</button>
+              <button class="linkish" onclick="go('login-unified')">Apply for Verification →</button>
+            </div>
+          </div>
+          <div class="home-verify-card">
+            <div class="kicker" style="margin-bottom:6px;">Public Registry</div>
+            <h2>Verify an Instrument</h2>
+            <p>Enter an instrument serial number to check its current registry and verification status.</p>
+            <div class="home-verify-input">
+              <input id="home-verify-id" value="LM-UP-000127" placeholder="Instrument ID / Serial No." />
+              <button onclick="go('public-result',{q:document.getElementById('home-verify-id').value.trim()||'LM-UP-000127'})">Verify</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+              <span class="chip ok">✓ Registry Check</span><span class="chip info">QR Ready</span><span class="chip muted">Status Lookup</span>
+            </div>
+          </div>
+        </div>
+        <div class="home-trust">
+          <div class="home-trust-item"><b>12,480+</b><span>Registered Instruments</span></div>
+          <div class="home-trust-item"><b>8,920+</b><span>Verified Records</span></div>
+          <div class="home-trust-item"><b>124</b><span>Inspections Today</span></div>
+          <div class="home-trust-item"><b>24×7</b><span>Public Status Access</span></div>
+        </div>
+        <div class="home-notice"><b>Important Notice</b><span>Owners and traders must submit a verification application before field verification. An appointment is shown only after a Metrology Officer approves the request.</span></div>
+      </div>
+
+      <section class="home-section">
+        <div class="home-section-head"><div><p class="kicker">Verification Lifecycle</p><h2>How PRAMĀṆA Works</h2></div><p>A simple, traceable workflow connecting the owner/trader with the Metrology Officer.</p></div>
+        <div class="workflow-line">
+          <div class="workflow-step"><span class="workflow-num">01 · OWNER</span><h3>Apply</h3><p>Submit instrument and establishment details for verification.</p></div>
+          <div class="workflow-step"><span class="workflow-num">02 · SYSTEM</span><h3>Pending</h3><p>The request enters the officer review queue with a clear status.</p></div>
+          <div class="workflow-step"><span class="workflow-num">03 · OFFICER</span><h3>Approve</h3><p>Officer checks the application and approves or rejects it.</p></div>
+          <div class="workflow-step"><span class="workflow-num">04 · OFFICER</span><h3>Schedule</h3><p>After approval, the officer assigns the verification date and time.</p></div>
+          <div class="workflow-step"><span class="workflow-num">05 · FIELD</span><h3>Verify</h3><p>The instrument is presented for physical inspection and verification.</p></div>
+        </div>
+      </section>
+
+      <section class="home-section">
+        <div class="home-section-head"><div><p class="kicker">Citizen Services</p><h2>What can you do?</h2></div><p>Quick access to the most important PRAMĀṆA services.</p></div>
+        <div class="home-actions-grid">
+          <div class="home-action-card"><div class="home-action-icon">⌕</div><h3>Verify an Instrument</h3><p>Check registry status, verification details and instrument identity using a serial number.</p><button onclick="openScanner()">Scan / Verify →</button></div>
+          <div class="home-action-card"><div class="home-action-icon">＋</div><h3>Apply for Verification</h3><p>Owners and traders can submit a new verification request online in a few steps.</p><button onclick="go('login-unified')">Start Application →</button></div>
+          <div class="home-action-card"><div class="home-action-icon">◷</div><h3>Track Application</h3><p>Follow your request from Pending to Approved and then to its scheduled appointment.</p><button onclick="go('login-unified')">Track Status →</button></div>
+          <div class="home-action-card"><div class="home-action-icon">§</div><h3>Rule Library</h3><p>Explore Legal Metrology guidance, standards and practical verification references.</p><button onclick="go('guidelines')">View Guidelines →</button></div>
+        </div>
+      </section>
+
+      <section class="home-section">
+        <div class="owner-strip"><div><p class="kicker" style="color:#e8d3a4;margin-bottom:5px;">For Owners &amp; Traders</p><h2>Need your instrument verified?</h2><p>Sign in, submit the application, wait for officer approval, then receive your verification date and time inside your dashboard.</p><div class="owner-steps"><span class="owner-step-pill">1 SIGN IN</span><span class="owner-step-pill">2 APPLY</span><span class="owner-step-pill">3 APPROVAL</span><span class="owner-step-pill">4 SCHEDULE</span><span class="owner-step-pill">5 FIELD VERIFY</span></div></div><button onclick="go('login-unified')">Start Application →</button></div>
+      </section>
+
+      <section class="home-section">
+        <div class="home-section-head"><div><p class="kicker">Built for Trust</p><h2>Why PRAMĀṆA?</h2></div><p>Designed to make instrument verification easier to apply for, review and track.</p></div>
+        <div class="why-grid">
+          <div class="why-item"><h3>Government Workflow</h3><p>Maps the application, officer review, scheduling and field verification lifecycle.</p></div>
+          <div class="why-item"><h3>Transparent Status</h3><p>Owners can see exactly whether their request is Pending, Approved, Scheduled or Completed.</p></div>
+          <div class="why-item"><h3>Secure Verification</h3><p>Public registry lookup and QR-oriented verification make instrument identity easier to check.</p></div>
+          <div class="why-item"><h3>Field Ready</h3><p>Officer scheduling connects digital applications with the physical inspection visit.</p></div>
+        </div>
+      </section>` + officialGovFooter();
+    }
+
+    let currentLoginRole = "user";
+    function unifiedLoginView() {
+      const isA = currentLoginRole === 'admin';
+      const isO = currentLoginRole === 'officer';
+      const isG = currentLoginRole === 'gatc';
+      const isU = currentLoginRole === 'user';
+      const roleLabel = isG ? 'GATC' : isA ? 'Admin' : isO ? 'Officer' : 'Trader';
+      const emailValue = isG ? 'gatc@pramana.in' : isA ? 'admin@pramana.in' : isO ? 'officer@pramana.in' : 'trader@pramana.in';
+      return '<div class="auth-shell-center"><div class="login-card-unified"><button class="linkish" style="margin-bottom:16px;color:var(--navy);border-color:var(--rule)" onclick="go(\'landing\')">← Back to Home</button><div class="brand-center"><div class="emblem-lg">⚖️</div><h2>प्रमाण PRAMANA</h2><p class="subt">Legal Metrology Verification Platform</p></div><div class="role-tabs"><button class="role-tab-btn ' + (isU ? 'active' : '') + '" onclick="setLoginRole(\'user\')">Trader</button><button class="role-tab-btn ' + (isO ? 'active' : '') + '" onclick="setLoginRole(\'officer\')">Officer</button><button class="role-tab-btn ' + (isA ? 'active' : '') + '" onclick="setLoginRole(\'admin\')">Admin</button><button class="role-tab-btn ' + (isG ? 'active' : '') + '" onclick="setLoginRole(\'gatc\')">GATC</button></div><div id="auth-err"></div><div class="auth-field"><label>Email or Mobile</label><input id="em" type="text" value="' + emailValue + '" /></div><div class="auth-field"><label>Password</label><input id="pw" type="password" value="password123" /></div><button class="btn-auth-submit" onclick="doUnifiedLogin()">Sign In (' + roleLabel.toUpperCase() + ')</button><div class="tiny mt" style="text-align:center;color:var(--muted);">Demo credentials auto-filled. Click sign in.</div></div></div>';
+    }
+
+    function setLoginRole(role) {
+      currentLoginRole = role;
+      render();
+    }
+
+    async function doUnifiedLogin() {
+  const err = $("#auth-err");
+  err.innerHTML = "";
+
+  const email = $("#em").value.trim();
+  const password = $("#pw").value;
+  const role = currentLoginRole;
+
+  if (!email || !password) {
+    err.innerHTML = '<div class="err">Email and password are required</div>';
+    return;
+  }
+
+  try {
+    const data = await api("/api/login", {
+      method: "POST",
+      body: {
+        email: email,
+        password: password,
+        role: role
+      }
+    });
+
+    if (!data || !data.user) {
+      throw new Error("Login response is invalid");
+    }
+
+    S.user = data.user;
+
+    if (S.user.role === "admin") {
+      go("admin-home");
+    } else if (S.user.role === "officer") {
+      go("officer-home");
+    } else if (S.user.role === "gatc") {
+      go("gatc-home");
+    } else {
+      go("consumer-home");
+    }
+
+  } catch (e) {
+    console.error("Login error:", e);
+    err.innerHTML = '<div class="err">' + (e.message || "Login failed") + '</div>';
+  }
+}
+    async function doLogout() {
+      try { await api("/api/logout", { method: "POST", body: "{}" }); } catch (e) {}
+      S.user = null;
+      go("landing");
+    }
+
+    function shell(nav, body, role) {
+      let items = [];
+      if (role === "admin") {
+        items = [
+          ["admin-home", "Dashboard", "Overview"],
+          ["admin-registry", "Instrument Registry", "Database"],
+          ["admin-applications", "Applications", "Workflows"],
+          ["admin-gatc-network", "GATC Network", "Approved centres"],
+          ["admin-inspections", "Inspections", "Field tests"],
+          ["admin-risk", "Risk & Enforcement", "Priority queue"],
+          ["admin-complaints", "Complaints", "Grievances"],
+          ["admin-officers", "Officers", "Workload"],
+          ["admin-analytics", "Reports & Analytics", "Metrics"],
+          ["admin-map", "Enforcement Map", "GIS View"],
+          ["guidelines", "Rule Library", "India + OIML"]
+        ];
+      } else if (role === "officer") {
+        items = [
+          ["officer-home", "Officer Desk", "Overview"],
+          ["officer-queue", "Inspection Queue", "Assigned"],
+          ["scan-lab", "Photo Authenticity", "Genuine vs clone"],
+          ["guidelines", "Rule Library", "Standards"]
+        ];
+      } else if (role === "gatc") {
+        items = [
+          ["gatc-home", "GATC Dashboard", "Centre overview"],
+          ["gatc-requests", "Assigned Instruments", "Instruments assigned for testing"],
+          ["gatc-schedule", "Test Schedule", "Upcoming tests"],
+          ["gatc-results", "Test Results", "Submitted test results"],
+          ["gatc-history", "Test History", "Instrument test lifecycle"],
+          ["gatc-notifications", "Notifications", "Alerts & updates"]
+        ];
+      } else {
+        items = [
+          ["consumer-home", "Trader Home", ""],
+          ["consumer-instruments", "My Instrument", ""],
+          ["verification-apply", "Register Instrument", ""],
+          ["verification-apply", "Apply for Verification", ""],
+          ["verification-applications", "My Application", ""],
+          ["fee-payment", "Fee & Payment", ""],
+          ["fee-payment", "My Instrument Certificate", ""],
+          ["consumer-complaints", "My Grievance", ""]
+        ];
+      }
+
+      if (role === "gatc") {
+        const u = S.user || {name:"GATC Operator", role:"GATC Operator", org:"ABC Legal Metrology", gatc_id:21};
+        const iconMap = {
+          "gatc-home":"▦","gatc-requests":"▤","gatc-schedule":"▣","gatc-results":"☑",
+          "gatc-history":"◷","gatc-notifications":"🔔"
+        };
+        let navBtns = "";
+        items.forEach(function(item) {
+          const activeClass = S.view === item[0] ? "active" : "";
+          navBtns += '<button class="navbtn ' + activeClass + '" onclick="go(\'' + item[0] + '\')"><span class="gatc-nav-icon">' + (iconMap[item[0]] || "•") + '</span><div>' + item[1] + '<small>' + item[2] + '</small></div></button>';
+        });
+        const initials = (u.name || "G").split(" ").map(function(x){return x[0]}).slice(0,2).join("").toUpperCase();
+        const g = currentGatc();
+        return '<div class="app gatc-shell"><aside class="gatc-side"><div class="gatc-side-brand"><div class="brand-emblem">⚖</div><div><div class="nm">PRAMĀṆA</div><div class="sub">Legal Metrology Verification Platform</div></div></div><nav class="gatc-nav">' + navBtns + '</nav><div class="gatc-side-bottom"><div class="gatc-side-user"><div class="gatc-avatar">' + initials + '</div><div><b>' + (u.name || "GATC Operator") + '</b><span>' + (g.code || "GATC") + '</span></div></div><button class="gatc-signout" onclick="doLogout()">↪ &nbsp; Logout</button></div></aside><div class="gatc-content"><header class="gatc-header"><div class="gatc-header-brand"><div class="brand-emblem">⚖</div><div><div class="nm">प्रमाण PRAMĀṆA</div><div class="sub">Legal Metrology Verification Platform</div></div></div><div class="gatc-header-right"><button class="gatc-header-bell" onclick="toggleNotifications(event)" title="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="gatc-header-badge">3</span></button><div class="gatc-account"><div class="gatc-avatar">' + initials + '</div><div><b>ABC Legal Metrology</b><span>' + (g.code || "GATC-021") + '</span></div><span class="chev">⌄</span></div></div></header><div class="main gatc-main">' + body + '</div></div></div>';
+      }
+
+      let navBtns = "";
+      items.forEach(function(item, index) {
+        let activeClass = "";
+        if (role === "user") {
+          activeClass = S.navActive === index ? "active" : "";
+        } else {
+          activeClass = S.view === item[0] ? "active" : "";
+        }
+        navBtns += '<button class="navbtn ' + activeClass + '" onclick="go(\'' + item[0] + '\', {}, ' + index + ')"><div>' + item[1] + '<small>' + item[2] + '</small></div></button>';
+      });
+
+      let mobileBtns = "";
+      items.forEach(function(item) {
+        mobileBtns += '<button class="linkish" style="color:#eadfcb;border-color:#334" onclick="go(\'' + item[0] + '\')">' + item[1] + '</button>';
+      });
+
+      const u = S.user || { name: "Guest", role: "Consumer", org: "Public User", district: "Lucknow" };
+      return '<div class="app"><aside class="side">' + brand() + '<div style="margin: 12px 0;">' + navBtns + '</div><div class="who"><b>' + (u.name || "User") + '</b>' + (u.title || u.role) + '<br><span class="tiny">' + (u.org || "Public") + ' · ' + (u.district || "") + '</span><div class="mt"><button class="btn btn-ghost btn-full" onclick="doLogout()">Sign out</button></div></div></aside><div><div style="height:58px;display:flex;align-items:center;justify-content:flex-end;padding:0 28px;border-bottom:1px solid var(--rule);background:rgba(255,255,255,.82);"><div>' + notificationBellHtml() + '</div></div><div class="mobile-nav">' + mobileBtns + '</div><div class="main">' + body + '</div></div></div>';
+    }
+
+    function kpi(n, l) {
+      return '<div class="card kpi"><b>' + n + '</b><span>' + l + '</span></div>';
+    }
+
+    async function consumerInstrumentsView() {
+      const rows = [
+        { name: "Fuel Dispenser", id: "LM-00127", status: "verified", certificate: "Valid", expiry: "12 Jan 2027", action: "View", serial: "LM-UP-000127" },
+        { name: "Fuel Dispenser", id: "LM-00128", status: "pending", certificate: "—", expiry: "—", action: "Track", serial: "LM-UP-000128" },
+        { name: "Weighing Scale", id: "LM-00431", status: "expired", certificate: "Expired", expiry: "20 Aug 2026", action: "Re-verify", serial: "LM-UP-000431" }
+      ];
+      let tableRows = "";
+      rows.forEach(function(r) {
+        let action = "";
+        if (r.action === "View") {
+          action = '<button class="linkish" onclick="go(\'public-result\',{q:\'' + r.serial + '\'})">View</button>';
+        } else if (r.action === "Track") {
+          action = '<button class="linkish" onclick="go(\'verification-applications\')">Track</button>';
+        } else {
+          action = '<button class="linkish" onclick="go(\'verification-apply\')">Re-verify</button>';
+        }
+        tableRows += '<tr>' +
+          '<td><b>' + r.name + '</b></td>' +
+          '<td class="mono">' + r.id + '</td>' +
+          '<td>' + chip(r.status) + '</td>' +
+          '<td>' + r.certificate + '</td>' +
+          '<td class="mono">' + r.expiry + '</td>' +
+          '<td>' + action + '</td>' +
+          '</tr>';
+      });
+      return shell("", '<p class="crumb">Owner / Trader Portal · My Instruments</p>' +
+        '<h1>My Instruments</h1>' +
+        '<p class="intro">View your registered instruments, verification status, certificate validity and expiry.</p>' +
+        '<div class="card" style="overflow-x:auto;">' +
+        '<h3 style="margin-bottom:14px;">My Instruments — Use an Instrument</h3>' +
+        '<table class="table"><thead><tr><th>Instrument</th><th>ID</th><th>Status</th><th>Certificate</th><th>Expiry</th><th>Action</th></tr></thead><tbody>' + tableRows + '</tbody></table>' +
+        '<p class="tiny" style="margin:14px 0 0;">(Clicking <b>View</b> opens the complete instrument history.)</p>' +
+        '</div>', "user");
+    }
+
+    async function feePaymentView() {
+      if (!S.user || S.user.role !== "user") return go("login-unified");
+      const apps = getOwnerApplications();
+      const paid = apps.find(function(a){ return a.status === "payment_paid" && a.payment; });
+      const pending = apps.find(function(a){ return a.status === "payment_pending" || a.status === "completed"; });
+      const defaultInst = paid ? paid.serial : (pending ? pending.serial : "LM-UP-000127");
+      const verified = DB.instruments.find(function(i){ return String(i.serial) === "LM-UP-000127"; }) || DB.instruments[0];
+      const certNo = verified ? "CERT-UP-2026-" + String(verified.id).padStart(4,"0") : "—";
+      const issueDate = verified && verified.last_verified ? verified.last_verified : new Date().toISOString().slice(0,10);
+      const expiryDate = verified && verified.next_due ? verified.next_due : "—";
+      const amount = pending ? verificationFeeForApplication(pending) : (paid ? Number(paid.payment.amount || verificationFeeForApplication(paid)) : 750);
+      const paymentCard = paid ?
+        '<div class="card" style="background:#e4f2ea;border-color:#b9ddc8;color:var(--green-d);"><div style="font-size:34px;line-height:1;margin-bottom:8px;">✓</div><h3 style="color:var(--green-d);margin-bottom:6px;">Payment Successful</h3><p style="margin:0 0 10px;color:inherit;">Your verification fee has been received.</p><div class="grid-2"><div><span class="tiny">TRANSACTION ID</span><br><b class="mono">' + paid.payment.payment_id + '</b></div><div><span class="tiny">AMOUNT PAID</span><br><b>₹' + Number(paid.payment.amount || 0).toLocaleString("en-IN") + '</b></div></div><div class="tiny" style="margin-top:10px;color:inherit;">Payment Date: ' + new Date(paid.payment.paid_on).toLocaleString("en-IN") + '</div></div>' :
+        '<div class="card" style="background:#fffaf0;border-color:#ead19b;"><h3>Verification Fee</h3><p class="tiny">Enter the instrument ID assigned to your verification application.</p><div class="field"><label>Instrument ID</label><input id="fee-instrument-id" class="mono" value="' + defaultInst + '" placeholder="LM-UP-000127"></div><div style="background:#f8f1e5;border:1px solid #ead9bf;border-radius:8px;padding:18px;margin-top:12px;text-align:center;"><div class="tiny">VERIFICATION FEE</div><div style="font-family:var(--serif);font-size:32px;color:var(--navy);font-weight:700;margin-top:4px;">₹' + Number(amount).toLocaleString("en-IN") + '</div></div><button class="btn btn-saffron btn-full mt" onclick="payFromFeePage()">Pay Now</button><div id="fee-payment-out" class="mt"></div></div>';
+      const certSection = '<div class="card mt"><div class="row"><div><h3>Certificate</h3><p class="tiny" style="margin:3px 0 0;">View your instrument certificate after successful payment.</p></div></div><div class="grid-2" style="margin-top:14px;"><div class="field"><label>Enter Instrument ID</label><input id="certificate-instrument-id" class="mono" value="' + defaultInst + '" placeholder="LM-UP-000127"></div><div style="display:flex;align-items:end;"><button class="btn btn-navy btn-full" onclick="viewCertificateFromFeePage()">View Certificate</button></div></div><div id="certificate-out" class="mt"></div></div>';
+      const body = '<p class="crumb">Owner / Trader Portal · Fee &amp; Payment</p><h1>Fee &amp; Payment</h1><p class="intro">Pay the verification fee and access your instrument certificate.</p><div class="grid-2"><div>' + paymentCard + certSection + '</div><div><div class="card" style="background:#f7f9fc;"><h3>Payment Status</h3><div class="part"><span>Verification fee</span>' + chip(paid ? "payment_paid" : (pending ? "payment_pending" : "unknown")) + '</div><div class="part"><span>Instrument</span><b class="mono">' + defaultInst + '</b></div><div class="part"><span>Certificate access</span><span class="tiny">Available after payment</span></div></div></div></div>';
+      return shell("", body, "user");
+    }
+
+    function payFromFeePage() {
+      const input = document.getElementById("fee-instrument-id");
+      const value = input ? input.value.trim().toUpperCase() : "";
+      const a = getOwnerApplications().find(function(x){ return String(x.serial || "").toUpperCase() === value || String(x.instrument_id) === value; });
+      if (!a) { const out=document.getElementById("fee-payment-out"); if(out) out.innerHTML='<div class="card" style="background:#f8e4df;color:var(--danger);">No matching verification application found for <b class="mono">' + value + '</b>. Complete the verification workflow first.</div>'; return; }
+      if (a.status !== "payment_pending" && a.status !== "completed") { const out=document.getElementById("fee-payment-out"); if(out) out.innerHTML='<div class="card" style="background:#fff7e6;color:var(--warn);">Payment is not available yet. The GATC instrument test must be passed first.</div>'; return; }
+      openVerificationPayment(a.id);
+    }
+
+    function viewCertificateFromFeePage() {
+      const input = document.getElementById("certificate-instrument-id");
+      const value = input ? input.value.trim().toUpperCase() : "";
+      const paid = getOwnerApplications().find(function(a){ return a.status === "payment_paid" && (String(a.serial || "").toUpperCase() === value || String(a.instrument_id) === value); });
+      const inst = DB.instruments.find(function(i){ return String(i.serial || "").toUpperCase() === value || String(i.id) === value; });
+      const out = document.getElementById("certificate-out");
+      if (!out) return;
+      if (!paid && (!inst || inst.status !== "verified")) { out.innerHTML='<div class="card" style="background:#fff7e6;color:var(--warn);">Certificate is not available yet. Complete payment and the verification process first.</div>'; return; }
+      if (!inst) { out.innerHTML='<div class="card" style="background:#f8e4df;color:var(--danger);">Instrument not found in your registry.</div>'; return; }
+      const certNo = "CERT-UP-2026-" + String(inst.id).padStart(4,"0");
+      out.innerHTML='<div class="card" style="background:#fffdf8;border:1px solid #ead9bf;"><div class="row"><h3>Certificate Details</h3>' + chip("valid") + '</div><table class="table" style="margin-top:10px;"><tr><th>Certificate No.</th><td class="mono"><b>' + certNo + '</b></td></tr><tr><th>Instrument ID</th><td class="mono">' + inst.serial + '</td></tr><tr><th>Instrument</th><td>' + inst.name + '</td></tr><tr><th>Issue Date</th><td class="mono">' + (inst.last_verified || "—") + '</td></tr><tr><th>Expiry Date</th><td class="mono">' + (inst.next_due || "—") + '</td></tr><tr><th>Owner / Establishment</th><td>' + inst.premises + '</td></tr><tr><th>Status</th><td>' + chip("valid") + '</td></tr></table><button class="btn btn-navy mt" onclick="go(\'public-result\',{q:\'' + inst.serial + '\'})">View Full Certificate</button></div>';
+    }
+
+    async function consumerHome() {
+      const complaints = DB.complaints;
+      const apps = getOwnerApplications();
+      const pending = apps.filter(function(a){return a.status === "pending";}).length;
+      const scheduled = apps.filter(function(a){return a.status === "scheduled";}).length;
+      const latest = apps[0];
+      const workflowCard = latest ? '<div class="card"><div class="row"><h3>Latest Verification Application</h3>' + chip(latest.status) + '</div><p class="tiny mono">' + latest.public_id + ' · ' + latest.serial + '</p>' + verificationTimeline(latest) + (latest.schedule ? '<div class="card" style="background:#e4f2ea;margin-top:12px;"><b style="color:var(--green-d);">Scheduled: ' + latest.schedule.date + ' at ' + latest.schedule.time + '</b><div class="tiny" style="color:var(--green-d);">Officer: ' + latest.schedule.officer + '</div></div>' : '') + '<button class="btn btn-navy mt" onclick="go(\'verification-applications\')">View My Applications</button></div>' : '<div class="card"><h3>Instrument Verification</h3><p class="tiny">Need your weighing or measuring instrument verified? Apply online first. The request goes to Pending, then a Metrology Officer approves it, and only then a date/time is scheduled.</p><button class="btn btn-saffron mt" onclick="go(\'verification-apply\')">Apply for Verification</button></div>';
+      return shell("", '<p class="crumb">Owner / Trader Portal · Instrument Safety</p><h1>Welcome, ' + (S.user?.name || "Citizen") + '.</h1><p class="intro">Manage instrument verification requests, track officer approval, view your verification schedule, scan instruments, and report issues.</p><div class="grid-3 mb"><div class="card" style="background:linear-gradient(135deg,#0e4a2e,#1a6b45);color:#fff;"><h3>Apply for Verification</h3><p style="opacity:0.9;font-size:14px;margin-bottom:14px;">Submit your instrument for Legal Metrology verification. Approval comes before scheduling.</p><button class="btn btn-gold" onclick="go(\'verification-apply\')">Start Application ➔</button></div><div class="card" style="background:var(--navy);color:#fff;"><h3>My Applications</h3><p style="font-family:var(--serif);font-size:32px;margin:6px 0;">' + apps.length + '</p><p style="font-size:13px;opacity:0.8;margin:0;">' + pending + ' pending · ' + scheduled + ' scheduled</p></div><div class="card" style="background:#fff;border-left:4px solid var(--saffron);"><h3>Verification Schedule</h3><p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Your date and time appear only after officer approval.</p><button class="btn btn-navy" onclick="go(\'verification-applications\')">View Schedule</button></div></div><div class="grid-2"><div>' + workflowCard + '</div><div><div class="card"><h3>Scan Instrument</h3><p class="tiny">Upload a nameplate, scale, sensor, or seal image for authenticity and compliance analysis.</p><button class="btn btn-navy mt" onclick="openScanner()">Launch Scanner</button></div><div class="card mt"><h3>Active Complaints</h3><p style="font-family:var(--serif);font-size:32px;margin:6px 0;">' + complaints.length + '</p><button class="btn btn-danger mt" onclick="go(\'consumer-complaints\')">View Complaints</button></div></div></div>', "user");
+    }
+
+    async function consumerNearby() {
+      return shell("", '<p class="crumb">Consumer Portal · Location Intelligence</p><h1>Nearby Verified Instruments</h1><p class="intro">Certified petrol dispensers, market platform scales, and weighbridges within 5 km of your location in Lucknow.</p><div class="card mb"><div id="map-consumer" style="width:100%;height:360px;border-radius:6px;"></div></div><div class="card"><h3>Certified Establishments Nearby</h3><table class="table"><thead><tr><th>Establishment</th><th>Type</th><th>District</th><th>Status</th><th>Validity</th></tr></thead><tbody><tr><td><b>Sharma Stores</b><div class="tiny">Hazratganj</div></td><td>Platform Scale</td><td>Lucknow</td><td>' + chip("verified") + '</td><td class="mono">12 Jan 2027</td></tr><tr><td><b>Bharat Petroleum</b><div class="tiny">Aliganj</div></td><td>Fuel Dispenser</td><td>Lucknow</td><td>' + chip("expired") + '</td><td class="mono">15 Jun 2025</td></tr><tr><td><b>Kashi Mandi Trader</b><div class="tiny">Varanasi</div></td><td>Counter Machine</td><td>Varanasi</td><td>' + chip("verified") + '</td><td class="mono">01 Feb 2027</td></tr></tbody></table></div>', "user");
+    }
+
+    async function consumerComplaintsView() {
+      let cmpRows = "";
+      DB.complaints.forEach(function(c) {
+        cmpRows += '<tr><td class="mono"><b>' + c.id + '</b></td><td><span class="mono">' + c.serial + '</span><div class="tiny">' + c.type + '</div></td><td>' + c.type + '</td><td>' + c.district + '</td><td class="mono">' + c.date + '</td><td>' + chip(c.status) + '</td><td>' + c.assigned_officer + '</td></tr>';
+      });
+      return shell("", '<p class="crumb">Consumer Portal</p><div class="row"><h1>My Complaints &amp; Grievances</h1><button class="btn btn-danger right" onclick="openComplaintModal()">+ Report New Issue</button></div><p class="intro">Track reports submitted regarding suspected meter tampering or short measurements.</p><div class="card"><table class="table"><thead><tr><th>ID</th><th>Instrument</th><th>Type</th><th>District</th><th>Date</th><th>Status</th><th>Assigned Officer</th></tr></thead><tbody>' + cmpRows + '</tbody></table></div>', "user");
+    }
+
+    function openComplaintModal() {
+      const modalHtml = '<div id="complaint-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:grid;place-items:center;z-index:1000;"><div class="card" style="width:100%;max-width:520px;background:#fff;"><h3>Report an Instrument Grievance</h3><p class="tiny mb">Submit a verified complaint to the Department of Consumer Affairs.</p><div class="field"><label>Instrument Serial / ID</label><input id="cmp-serial" class="mono" value="LM-UP-000431" /></div><div class="field"><label>Issue Category</label><select id="cmp-type"><option>Incorrect/Short measurement</option><option>Suspected tampering / broken seal</option><option>Overdue verification</option><option>QR / instrument mismatch</option></select></div><div class="field"><label>Description &amp; Location details</label><textarea id="cmp-desc" rows="3" placeholder="Provide details..."></textarea></div><div class="row"><button class="btn btn-danger" onclick="submitConsumerComplaint()">Submit Complaint</button><button class="btn btn-ghost" onclick="document.getElementById(\'complaint-modal\').remove()">Cancel</button></div></div></div>';
+      document.body.insertAdjacentHTML("beforeend", modalHtml);
+    }
+
+    function submitConsumerComplaint() {
+      const serial = $("#cmp-serial").value;
+      const type = $("#cmp-type").value;
+      const desc = $("#cmp-desc").value;
+      const newId = "CMP-" + (1026 + DB.complaints.length);
+      const complaintItem = { id: newId, instrument_id: 2, serial, type, description: desc, district: S.user?.district || "Lucknow", date: new Date().toISOString().slice(0,10), priority: "High", status: "New", assigned_officer: "Unassigned" };
+      DB.complaints.unshift(complaintItem);
+      api("/api/complaints", {method:"POST", body:complaintItem}).catch(function(){});
+      document.getElementById('complaint-modal').remove();
+      alert("Complaint successfully submitted with ID: " + newId);
+      go("consumer-complaints");
+    }
+
+    function scanLabView() {
+      const body = '<div class="scan-page">' +
+        '<div class="scan-trustbar">' +
+          '<div class="scan-trustitem"><div class="scan-trusticon">🛡</div><div><b>Authenticity &amp; Compliance Lab</b><span>OCR &amp; computer vision checks instrument authenticity and compliance.</span></div></div>' +
+          '<div class="scan-trustitem"><div class="scan-trusticon">◷</div><div><b>Fast &amp; Accurate</b><span>Clear, instant verification results.</span></div></div>' +
+          '<div class="scan-trustitem"><div class="scan-trusticon">🔒</div><div><b>Secure &amp; Private</b><span>Images used only for verification.</span></div></div>' +
+          '<div class="scan-trustitem"><div class="scan-trusticon">♜</div><div><b>Legal Metrology</b><span>Built around applicable rules.</span></div></div>' +
+          '<div class="scan-trustitem"><div class="scan-trusticon">✓</div><div><b>Trusted Workflow</b><span>Designed for fair trade &amp; safety.</span></div></div>' +
+        '</div>' +
+        '</div>' +
+        photoCheckMarkup({ publicMode: !S.user }) +
+        '<div class="scan-footer"><div class="scan-footer-item"><div class="scan-footer-icon">🛡</div><div><b>Your privacy is our priority</b><p>Uploaded images are used only for verification purposes.</p></div></div><div class="scan-footer-item"><div class="scan-footer-icon">⚖</div><div><b>Legal compliance</b><p>Results are presented in the context of Legal Metrology requirements.</p></div></div><div class="scan-footer-item"><div class="scan-footer-icon">◉</div><div><b>Need help?</b><p>Use the Pramāṇa Sahayak assistant or contact your local office.</p></div></div></div>' +
+      '</div>';
+      if (S.user) return shell("", body, S.user.role);
+      return '<div class="hero">' + topPublic() + body + '</div>';
+    }
+
+    let LAST_FILE = null;
+
+    function setPhotoFile(file, previewUrl) {
+      LAST_FILE = file;
+      const drop = $("#photo-drop");
+      const pill = $("#pill-1");
+      if (!file) return;
+      const url = previewUrl || URL.createObjectURL(file);
+      if (drop) {
+        drop.classList.add("has-file");
+        const inner = $("#drop-inner");
+        if (inner) {
+          inner.innerHTML = '<img class="preview-frame" src="' + url + '" alt="Uploaded instrument" /><div class="fname">Ready · ' + (file.name || "photo.jpg") + '</div><div class="row" style="justify-content:center;gap:10px;"><label class="btn btn-saffron" style="padding:8px 14px;font-size:13px;">Upload Different<input id="photo" type="file" accept="image/*" capture="environment" /></label><button type="button" class="btn btn-danger" style="padding:8px 14px;font-size:13px;" onclick="retakePhoto()">Retake / Reset</button></div>';
+          const input = $("#photo");
+          if (input) input.addEventListener("change", function(e) {
+            const f = e.target.files && e.target.files[0];
+            if (f) { setPhotoFile(f); runOCR(f); }
+          });
+        }
+      }
+      if (pill) pill.classList.add("ready");
+      const out = $("#scan-out");
+      if (out) out.innerHTML = '<div class="scan-stage"><img src="' + url + '" alt="preview" /><div class="scanline"></div></div><p class="tiny mt" style="text-align:center;">Picture uploaded successfully.</p>';
+    }
+
+    function retakePhoto() {
+      LAST_FILE = null;
+      const drop = $("#photo-drop");
+      if (drop) {
+        drop.classList.remove("has-file");
+        const inner = $("#drop-inner");
+        if (inner) {
+          inner.innerHTML = '<div class="upload-icon">↥</div><h3>Drag &amp; drop an image here<br/>or use your camera / file</h3><p>Supported formats: JPG, PNG &nbsp;•&nbsp; Max size: 10MB</p><div class="scan-buttons"><label class="btn btn-saffron" style="cursor:pointer;">↥ &nbsp; Upload Picture<input id="photo" type="file" accept="image/*" style="display:none;" /></label><button type="button" class="btn btn-navy" onclick="openCamera()">▣ &nbsp; Use Camera</button></div>';
+          bindPhotoCheckEvents();
+        }
+      }
+      const pill1 = $("#pill-1");
+      if (pill1) pill1.classList.remove("ready");
+      const pill2 = $("#pill-2");
+      if (pill2) pill2.classList.remove("ready");
+      const out = $("#scan-out");
+      if (out) out.innerHTML = '<div class="scan-stage"><p class="tiny">Upload a picture to preview it here.</p></div>';
+    }
+
+    function photoCheckMarkup(opts) {
+      opts = opts || {};
+      const compact = !!opts.compact;
+      return '<div class="scan-workspace photo-lab">' +
+        '<div class="steps-row"><div class="step-pill ready" id="pill-1"><span class="n">1</span> Upload picture</div></div>' +
+        '<div class="scan-work-grid"><div class="scan-main">' +
+          '<div class="dropzone scan-dropzone" id="photo-drop"><div id="drop-inner">' +
+            '<div class="upload-icon">↥</div><h3>Drag &amp; drop an image here<br/>or use your camera / file</h3>' +
+            '<p>Supported formats: JPG, PNG &nbsp;•&nbsp; Max size: 10MB</p>' +
+            '<div class="scan-buttons"><label class="btn btn-saffron" style="cursor:pointer;">↥ &nbsp; Upload Picture<input id="photo" type="file" accept="image/*" style="display:none;" /></label>' +
+            '<button type="button" class="btn btn-navy" onclick="openCamera()">▣ &nbsp; Use Camera</button></div>' +
+            '' +
+          '</div></div>' +
+        '</div>' +
+        '' +
+        '</div>' +
+      '</div></div>';
+    }
+    function bindPhotoCheckEvents() {
+      const drop = $("#photo-drop");
+      if (!drop) return;
+      const input = $("#photo");
+      if (input) input.addEventListener("change", function(e) {
+        const f = e.target.files && e.target.files[0];
+        if (f) { setPhotoFile(f); runOCR(f); }
+      });
+      const camInput = $("#camera-file");
+      if (camInput) camInput.addEventListener("change", function(e) {
+        const f = e.target.files && e.target.files[0];
+        if (f) { setPhotoFile(f); runOCR(f); }
+      });
+      ["dragenter", "dragover"].forEach(function(ev) { drop.addEventListener(ev, function(e) { e.preventDefault(); drop.classList.add("hot"); }); });
+      ["dragleave", "drop"].forEach(function(ev) { drop.addEventListener(ev, function(e) { e.preventDefault(); drop.classList.remove("hot"); }); });
+      drop.addEventListener("drop", function(e) {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) { setPhotoFile(f); runOCR(f); }
+      });
+    }
+
+    async function useSample(url, serial) {
+      try {
+        const blob = await fetch(url).then(function(r) { return r.blob(); });
+        const file = new File([blob], url.split("/").pop(), { type: blob.type || "image/jpeg" });
+        setPhotoFile(file, url);
+      } catch (e) {
+        setPhotoFile(new File(["dummy"], "sample.jpg", { type: "image/jpeg" }), url);
+      }
+    }
+
+    async function runScan() {
+      const out = $("#scan-out");
+      const pill2 = $("#pill-2");
+      if (!LAST_FILE) {
+        out.innerHTML = '<div class="err">Step 1 first: upload a picture, then tap Check.</div>';
+        return;
+      }
+      if (pill2) pill2.classList.add("ready");
+      out.innerHTML = '<div class="scan-stage"><p>Analyzing nameplate · stamp · seal · OEM fingerprint…</p><div class="scanline"></div></div><ul class="steps mt"><li><span class="dot on"></span> Image optical resolution &amp; clarity</li><li><span class="dot on"></span> Component &amp; sensor classification</li><li><span class="dot on"></span> OEM digital fingerprint comparison</li><li><span class="dot on"></span> Model approval registry check</li><li><span class="dot on"></span> Legal Metrology &amp; OIML R 76 compliance</li></ul>';
+      const fd = new FormData();
+      fd.append("photo", LAST_FILE);
+      fd.append("serial", "");
+      fd.append("claimed_type", "electronic_weighing");
+
+      try {
+        const r = await api(S.user ? "/api/analyze" : "/api/public/analyze", { method: "POST", body: fd });
+        renderScan(r);
+      } catch (e) {
+        out.innerHTML = '<div class="err">' + e.message + '</div>';
+      }
+    }
+
+    function renderScan(r) {
+      let parts = "";
+      (r.parts || []).forEach(function(p) {
+        parts += '<div class="part"><div><b>' + p.part + '</b><div class="tiny">' + p.note + '</div></div>' + chip(p.status) + '</div>';
+      });
+      let flags = "";
+      (r.flags || []).forEach(function(f) { flags += '<li>' + f + '</li>'; });
+      let passed = "";
+      (r.compliance?.passed || []).forEach(function(x) { passed += '<li class="ok-text" style="font-size:13px;">' + x + '</li>'; });
+      let issues = "";
+      (r.compliance?.issues || []).forEach(function(x) { issues += '<li class="bad-text" style="font-size:13px;">' + x + '</li>'; });
+
+      $("#scan-out").innerHTML = '<div class="verdict-hero ' + r.label + '"><h2>' + r.headline + '</h2><p>Confidence ' + r.confidence + '% · visual match ' + (r.nearest_reference || "OEM Standard") + ' (hamming ' + r.hamming + ')</p></div><div class="card mb"><img src="' + r.photo_url + '" alt="" style="width:100%;border-radius:6px;max-height:200px;object-fit:cover" /><h3 class="mt">Forensic Findings</h3><ul>' + flags + '</ul></div><div class="card mb"><h3>Component Authenticity</h3>' + parts + '</div><div class="card"><h3>Compliance Engine · ' + (r.compliance?.verdict || "COMPLIANT") + '</h3><ul>' + passed + '</ul><ul>' + issues + '</ul></div>';
+    }
+
+    async function publicResultView() {
+      const q = S.payload.q || "LM-UP-000127";
+      let d;
+      try {
+        d = await api("/api/public/verify?q=" + encodeURIComponent(q));
+      } catch (e) {
+        d = { found: false, note: "Instrument not found on registry." };
+      }
+
+      let body = "";
+      if (!d.found) {
+        body = '<div class="hero">' + topPublic() + '<p class="kicker">Certificate &amp; Instrument Verification</p><h1 class="display">Verification Result</h1><p class="lede">Queried Token / Serial: <b class="mono">' + q + '</b></p><div class="verdict-hero NON_COMPLIANT mt"><h2>Not Found on Registry</h2><p>' + d.note + '</p></div></div>';
+      } else {
+        let passedList = "";
+        (d.compliance.passed || []).forEach(function(x) { passedList += '<li class="ok-text" style="font-size:13px;margin-bottom:6px;">' + x + '</li>'; });
+        let issuesList = "";
+        (d.compliance.issues || []).forEach(function(x) { issuesList += '<li class="bad-text" style="font-size:13px;margin-bottom:6px;">' + x + '</li>'; });
+        const certNo = d.certificate ? d.certificate.cert_no : "CERT-UP-2026-4412";
+
+        body = '<div class="hero">' + topPublic() + '<p class="kicker">Certificate &amp; Instrument Verification</p><h1 class="display">Verification Result</h1><p class="lede">Queried Token / Serial: <b class="mono">' + q + '</b></p><div class="verdict-hero ' + d.compliance.verdict + ' mt"><h2>' + d.compliance.verdict.replace("_", " ") + '</h2><p>' + d.manufacturer + ' ' + d.model + ' · Serial <b class="mono">' + d.serial + '</b> · ' + (d.oem_status === "genuine" ? "Genuine OEM Approved" : "Third-party Unapproved") + '</p></div><div class="grid-2"><div class="card"><img src="data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'220\'><rect width=\'400\' height=\'220\' fill=\'%23eaf0f6\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'sans-serif\' font-size=\'16\' fill=\'%231f3a5f\'>Scale Inspection Image</text></svg>" alt="" style="width:100%;border-radius:6px;max-height:220px;object-fit:cover;" class="mb" /><table class="table"><tr><th>Establishment</th><td>' + d.premises + ', ' + d.district + ', ' + d.state + '</td></tr><tr><th>Accuracy Class</th><td>Class ' + d.accuracy_class + ' (Max ' + d.max_kg + ' kg)</td></tr><tr><th>Model Approval</th><td class="mono">' + (d.model_approval || "IND/09/2019/214") + '</td></tr><tr><th>LMO Stamp</th><td>' + d.stamp_lmo + ' · Year ' + d.stamp_year + ' · Qtr ' + d.stamp_quarter + '</td></tr><tr><th>Last Verified</th><td class="mono">' + d.last_verified + '</td></tr><tr><th>Next Due Date</th><td class="mono" style="color:var(--danger);font-weight:700;">' + d.next_due + '</td></tr><tr><th>Certificate No</th><td class="mono"><b>' + certNo + '</b></td></tr></table></div><div class="card"><h3>Compliance &amp; Inspection Audit</h3><h4 class="ok-text mt">Checks Passed</h4><ul>' + passedList + '</ul>' + (issuesList ? '<h4 class="bad-text mt">Issues &amp; Violations</h4><ul>' + issuesList + '</ul>' : '<p class="tiny mt">No violations reported. Lead seal wire and security stamp are fully intact.</p>') + '<div class="mt" style="padding-top:14px;border-top:1px solid var(--rule);"><button class="btn btn-danger btn-full" onclick="openComplaintModal()">Report an Issue on this Instrument</button></div></div></div></div>';
+      }
+      return body;
+    }
+
+    async function adminHome() {
+      const st = await api("/api/stats");
+      const highRiskList = DB.instruments.filter(function(i) { return i.oem_status === "third_party" || i.status === "expired"; });
+      let highRiskRows = "";
+      highRiskList.forEach(function(i) {
+        highRiskRows += '<tr><td><b>' + i.serial + '</b><div class="tiny">' + i.premises + '</div></td><td>' + chip("NON_COMPLIANT") + '</td><td><span class="bad-text">Expired / Third-party parts</span></td><td><button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-risk\')">Enforce ➔</button></td></tr>';
+      });
+
+      return shell("", '<p class="crumb">Government Dashboard · Ministry of Consumer Affairs</p><h1>Director General Enforcement Console</h1><p class="intro">Monitor statewide instrument compliance, prioritize high-risk enforcement queues, assign field inspections, and review audit trails.</p><div class="grid-4 mb"><div class="card kpi" onclick="go(\'admin-registry\')" style="cursor:pointer;"><b>' + st.instruments + '</b><span>Total Registered Instruments</span></div><div class="card kpi" onclick="go(\'admin-applications\')" style="cursor:pointer;"><b>' + DB.applications.length + '</b><span>Pending Applications</span></div><div class="card kpi" onclick="go(\'admin-inspections\')" style="cursor:pointer;"><b>4</b><span>Today\'s Inspections</span></div><div class="card kpi" onclick="go(\'admin-risk\')" style="cursor:pointer;background:#f8e4df;border-color:var(--danger);"><b style="color:var(--danger);">' + highRiskList.length + '</b><span style="color:var(--danger);">High-Risk Instruments</span></div></div><div class="grid-2 mb"><div class="card"><h3>Priority Risk &amp; Enforcement Queue</h3><p class="tiny mb">Instruments requiring immediate government intervention based on failed MPE or active complaints.</p><table class="table"><thead><tr><th>Instrument</th><th>Risk Level</th><th>Reason</th><th>Action</th></tr></thead><tbody>' + highRiskRows + '</tbody></table></div><div class="card"><h3>Government Activity Alerts</h3><div style="display:flex;flex-direction:column;gap:10px;"><div class="part"><span>New complaint filed on Bharat Fuels Dispenser #3</span>' + chip("warn") + '</div><div class="part"><span>Inspection assigned to Rahul Sharma</span>' + chip("info") + '</div><div class="part"><span>Instrument verification completed for Sharma Kirana</span>' + chip("verified") + '</div><div class="part"><span>Weighbridge model approval verified (C3)</span>' + chip("ok") + '</div></div></div></div>', "admin");
+    }
+
+    async function adminRegistry() {
+      let rows = "";
+      DB.instruments.forEach(function(i) {
+        rows += '<tr><td class="mono"><b>' + i.serial + '</b></td><td>' + (TYPE_LABEL[i.type] || i.type) + '</td><td>' + i.name + '<div class="tiny">' + i.premises + '</div></td><td>' + i.district + '</td><td>' + chip(i.status) + '</td><td>' + (i.oem_status === "third_party" ? chip("NON_COMPLIANT") : chip("COMPLIANT")) + '</td><td><button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-instrument-detail\', {id:' + i.id + '})">Details</button></td></tr>';
+      });
+
+      return shell("", '<p class="crumb">Government Dashboard</p><div class="row"><h1>Instrument Registry</h1><button class="btn btn-saffron right" onclick="alert(\'Exported CSV of 12,486 records.\')">Export CSV</button></div><p class="intro">Search across all registered weighing and measuring instruments statewide.</p><div class="card mb"><div class="row"><input id="reg-search" placeholder="Search ID, serial, owner or district..." style="flex:1;" oninput="filterRegistry(this.value)" /></div></div><div class="card"><table class="table" id="registry-table"><thead><tr><th>Instrument ID</th><th>Type</th><th>Owner &amp; Establishment</th><th>District</th><th>Status</th><th>Risk</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div>', "admin");
+    }
+
+    function filterRegistry(q) {
+      const rows = document.querySelectorAll("#registry-table tbody tr");
+      rows.forEach(function(r) {
+        r.style.display = r.innerText.toLowerCase().indexOf(q.toLowerCase()) !== -1 ? "" : "none";
+      });
+    }
+    async function adminInstrumentDetail() {
+      const id = S.payload.id || 1;
+      const d = DB.instruments.find(function(i) { return i.id === id; }) || DB.instruments[0];
+      let passedList = "";
+      (d.compliance.passed || []).forEach(function(x) { passedList += '<li class="ok-text" style="font-size:13px;margin-bottom:6px;">' + x + '</li>'; });
+      let issuesList = "";
+      (d.compliance.issues || []).forEach(function(x) { issuesList += '<li class="bad-text" style="font-size:13px;margin-bottom:6px;">' + x + '</li>'; });
+      return shell("", '<p class="crumb">Instrument Dossier · ' + d.serial + '</p><div class="row"><h1>' + d.name + '</h1> ' + chip(d.status) + ' ' + chip(d.oem_status) + '</div><p class="intro">' + d.manufacturer + ' ' + d.model + ' · Premises: ' + d.premises + ', ' + d.district + '</p><div class="grid-2"><div><div class="card mb"><h3>Technical Specifications</h3><table class="table"><tr><th>Serial Number</th><td class="mono"><b>' + d.serial + '</b></td></tr><tr><th>Instrument Type</th><td>' + TYPE_LABEL[d.type] + '</td></tr><tr><th>Accuracy Class</th><td>Class ' + d.accuracy_class + ' (Max ' + d.max_kg + ' kg, e=' + d.e_value + ')</td></tr><tr><th>Model Approval</th><td class="mono">' + d.model_approval + '</td></tr><tr><th>LMO Stamp</th><td>' + d.stamp_lmo + ' (' + d.stamp_year + ' Q' + d.stamp_quarter + ')</td></tr><tr><th>Last Verification</th><td class="mono">' + d.last_verified + '</td></tr><tr><th>Next Due Date</th><td class="mono">' + d.next_due + '</td></tr></table></div><div class="card"><h3>Lifecycle Timeline</h3><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;"><div class="part"><span>✓ Registration — 12 Jan 2025</span>' + chip("verified") + '</div><div class="part"><span>✓ First Field Inspection — 12 Jan 2025</span>' + chip("ok") + '</div><div class="part"><span>✓ Instrument verified — ' + d.last_verified + '</span>' + chip("verified") + '</div><div class="part"><span>⚠ Next re-verification due — ' + d.next_due + '</span>' + chip("warn") + '</div></div></div></div><div><div class="verdict-hero ' + d.compliance.verdict + '"><h2>Compliance: ' + d.compliance.verdict + '</h2><p>Risk Score: ' + (d.oem_status === "third_party" ? "88 / 100 (HIGH RISK)" : "12 / 100 (LOW RISK)") + '</p></div><div class="card mb"><h3>Compliance &amp; Inspection Audit</h3><h4 class="ok-text mt">Checks Passed</h4><ul>' + passedList + '</ul>' + (issuesList ? '<h4 class="bad-text mt">Issues &amp; Violations</h4><ul>' + issuesList + '</ul>' : '<p class="tiny mt">No violations reported. Lead seal wire and security stamp are fully intact.</p>') + '</div><div class="card"><h3>Enforcement Actions</h3><p class="tiny mb">Take immediate administrative action on this instrument file.</p><div style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-saffron" onclick="go(\'admin-assign\', {iid:' + d.id + '})">Assign Field Inspection</button><button class="btn btn-danger" onclick="alert(\'Instrument flagged and seal confiscated.\')">Flag &amp; Revoke</button><button class="btn btn-navy" onclick="openComplaintModal()">Report an Issue</button></div></div></div></div>', "admin");
+    }
+
+    async function adminApplications() {
+      let appRows = "";
+      DB.applications.forEach(function(a) {
+        appRows += '<tr><td class="mono"><b>' + a.public_id + '</b></td><td><span class="mono">' + a.serial + '</span><div class="tiny">' + a.instrument_name + '</div></td><td>' + a.applicant_name + '<div class="tiny">' + a.org + '</div></td><td>' + a.district + '</td><td>' + a.kind + '</td><td>' + chip(a.status) + '</td><td>' + a.assigned_officer + '</td><td>' + (a.gatc_id ? '<span class="tiny">GATC: ' + ((DB.gatcs.find(function(g){return g.id === a.gatc_id;}) || {}).code || "Assigned") + '</span>' : '<button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-gatc-assign\', {aid:' + a.id + '})">Assign GATC</button>') + '</td></tr>';
+      });
+      return shell("", '<p class="crumb">Government Dashboard</p><h1>Application Management</h1><p class="intro">Review first-time verifications, re-verifications, and repair filings under Section 24.</p><div class="card"><table class="table"><thead><tr><th>App ID</th><th>Instrument</th><th>Applicant</th><th>District</th><th>Kind</th><th>Status</th><th>Assigned Officer</th><th>Action</th></tr></thead><tbody>' + appRows + '</tbody></table></div>', "admin");
+    }
+
+    async function adminAssign() {
+      const iid = S.payload.iid || 1;
+      const inst = DB.instruments.find(function(i) { return i.id === iid; }) || DB.instruments[0];
+      return shell("", '<p class="crumb">Enforcement Workflow · Step 2: Assign Inspection</p><h1>Schedule Field Inspection</h1><p class="intro">Assign a qualified Legal Metrology Inspector to perform MPE testing and lead sealing on <b class="mono">' + inst.serial + '</b>.</p><div class="card" style="max-width:600px;"><div class="field"><label>Instrument</label><input class="mono" readonly value="' + inst.serial + ' — ' + inst.name + '" /></div><div class="field"><label>Select Inspecting Officer</label><select id="assign-officer"><option>Rahul Sharma (LMO-LKO-01) — 6 pending</option><option>Priya Verma (LMO-LKO-02) — 3 pending</option><option>Manoj Kumar (LMO-KNP-01) — 8 pending</option></select></div><div class="grid-2"><div class="field"><label>Inspection Date</label><input type="date" id="assign-date" value="2026-08-28" /></div><div class="field"><label>Priority Level</label><select id="assign-prio"><option>High Priority</option><option>Standard</option></select></div></div><div class="field"><label>Special Instructions</label><textarea id="assign-notes" rows="3">Verify load cell serial number and check lead wire seal integrity.</textarea></div><button class="btn btn-saffron btn-full" onclick="confirmAssignment()">Confirm &amp; Dispatch Inspection</button><div id="assign-out" class="mt"></div></div>', "admin");
+    }
+
+    function confirmAssignment() {
+      $("#assign-out").innerHTML = '<div class="card" style="background:#e4f2ea;color:var(--green-d);border:1px solid var(--green);">Inspection successfully assigned to <b>Rahul Sharma</b> for 28 Aug 2026. Status updated to <b>Scheduled</b>.</div>';
+      setTimeout(function() { go("admin-inspections"); }, 1500);
+    }
+
+
+    function gatcEligibilityScore(g, inst) {
+      if (!g || !inst || g.status !== "active" || g.availability === "Unavailable") return -1;
+      const category = TYPE_LABEL[inst.type] || inst.type;
+      const authorized = g.authorized.some(function(x){
+        return x.toLowerCase() === category.toLowerCase() ||
+               x.toLowerCase().replace(" dispenser","") === category.toLowerCase().replace(" dispenser","");
+      });
+      if (!authorized) return -1;
+      let score = 100;
+      if (g.district !== inst.district) score -= 20;
+      if (g.workload === "High") score -= 30;
+      else if (g.workload === "Medium") score -= 15;
+      if (g.availability === "Limited") score -= 10;
+      score -= Math.min(20, Math.max(0, Math.round((g.completed / Math.max(1,g.capacity)) * 10)));
+      return score;
+    }
+
+    async function adminGatcNetwork() {
+      const total = DB.gatcs.length;
+      const active = DB.gatcs.filter(function(g){return g.status === "active";}).length;
+      const review = DB.gatcs.filter(function(g){return g.status === "under_review";}).length;
+      const suspended = DB.gatcs.filter(function(g){return g.status === "suspended";}).length;
+      const expiring = DB.gatcs.filter(function(g){return new Date(g.valid_until) <= new Date("2027-09-30");}).length;
+      const rows = DB.gatcs.map(function(g){
+        const auth = g.authorized.map(function(x){return '<span class="gatc-auth">✓ ' + x + '</span>';}).join("");
+        const workloadClass = g.workload === "High" ? "bad" : g.workload === "Medium" ? "warn" : "ok";
+        return '<tr><td class="mono"><b>' + g.code + '</b><div class="tiny">' + g.name + '</div></td><td>' + g.organization + '<div class="tiny">' + g.location + '</div></td><td><span class="chip ok">ACTIVE</span><div class="tiny mt">Valid until ' + g.valid_until + '</div></td><td><div class="gatc-auth-list">' + auth + '</div></td><td><span class="chip ' + workloadClass + '">' + g.workload + '</span><div class="tiny">' + g.availability + ' · ' + g.capacity + '/month</div></td><td><button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-gatc-assign\',{aid:103})">Test Assignment</button></td></tr>';
+      }).join("");
+      return shell("", '<p class="crumb">Government Dashboard · GATC Network</p><div class="row"><div><h1>GATC Network</h1><p class="intro">Manage Government Approved Test Centres, review category authorizations, monitor capacity and route test assignments to eligible centres.</p></div><button class="btn btn-saffron" onclick="go(\'admin-gatc-assign\',{aid:103})">Smart Assignment</button></div><div class="grid-4 mb"><div class="card kpi"><b>' + total + '</b><span>Total GATCs</span></div><div class="card kpi"><b>' + active + '</b><span>Active</span></div><div class="card kpi"><b>' + review + '</b><span>Under Review</span></div><div class="card kpi"><b>' + suspended + '</b><span>Suspended</span></div></div><div class="card mb"><div class="row"><h3>Approval &amp; Capacity Overview</h3><span class="chip warn right">' + expiring + ' expiring approval</span></div><table class="table"><thead><tr><th>GATC</th><th>Organization / Location</th><th>Approval</th><th>Authorized Categories</th><th>Workload / Capacity</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div><div class="card"><h3>Test Assignment Rule</h3><p class="tiny">A GATC can only receive an instrument assignment when its approval is active and its authorized instrument category matches. Recommendations also consider district, workload, availability and verification capacity.</p></div>', "admin");
+    }
+
+    async function adminGatcAssign() {
+      const aid = S.payload.aid || 103;
+      const a = DB.applications.find(function(x){ return x.id === aid; }) || DB.applications[0];
+      const inst = DB.instruments.find(function(i){ return i.id === a.instrument_id; }) || DB.instruments[0];
+      const recommendations = DB.gatcs.map(function(g){
+        return {g:g, score:gatcEligibilityScore(g,inst)};
+      }).filter(function(x){return x.score >= 0;}).sort(function(a,b){return b.score-a.score;});
+      const rows = recommendations.map(function(x, idx){
+        const g=x.g;
+        return '<tr><td><b>' + (idx === 0 ? '★ Recommended · ' : '') + g.code + '</b><div class="tiny">' + g.name + '</div></td><td>' + (g.district === inst.district ? 'Same district' : g.district + ' district') + '</td><td><span class="chip ok">Authorized ✓</span></td><td>' + g.workload + '</td><td>' + g.availability + '</td><td><b>' + x.score + '</b> / 100</td><td><button class="btn ' + (idx === 0 ? 'btn-saffron' : 'btn-navy') + '" onclick="assignGatcToApplication(' + a.id + ',' + g.id + ')">Assign</button></td></tr>';
+      }).join("");
+      const blocked = DB.gatcs.filter(function(g){ return gatcEligibilityScore(g,inst) < 0; }).map(function(g){ return '<span class="gatc-auth no">✕ ' + g.code + ' — category/approval not eligible</span>'; }).join("");
+      return shell("", '<p class="crumb">Government Dashboard · GATC Assignment</p><h1>Smart GATC Assignment</h1><p class="intro">Eligible centres are ranked using authorization, location/district, workload, availability, verification capacity and approval status.</p><div class="card mb"><h3>Application</h3><div class="grid-2"><div><b class="mono">' + a.public_id + '</b><div class="tiny">' + a.applicant_name + ' · ' + a.org + '</div></div><div><b>' + inst.name + '</b><div class="tiny">' + (TYPE_LABEL[inst.type] || inst.type) + ' · ' + inst.district + '</div></div></div></div><div class="card"><h3>Recommended GATCs</h3><table class="table"><thead><tr><th>GATC</th><th>Location</th><th>Authorization</th><th>Workload</th><th>Availability</th><th>Match Score</th><th>Action</th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" class="tiny">No eligible GATC found.</td></tr>') + '</tbody></table><div class="gatc-status-strip mt">' + blocked + '</div></div>', "admin");
+    }
+
+    function assignGatcToApplication(aid, gid) {
+      const a = DB.applications.find(function(x){ return x.id === aid; });
+      const g = DB.gatcs.find(function(x){ return x.id === gid; });
+      if (!a || !g) return;
+      const inst = DB.instruments.find(function(i){ return i.id === a.instrument_id; });
+      if (gatcEligibilityScore(g,inst) < 0) {
+        alert("Assignment blocked: this GATC is not eligible for the instrument category or approval/capacity rules.");
+        return;
+      }
+      a.gatc_id = g.id;
+      a.gatc_assigned_on = new Date().toISOString().slice(0,10);
+      a.status = "gatc_assigned";
+      addNotification("gatc", "New Test Assignment", a.public_id + " has been assigned to " + g.code + " for instrument testing.", "📋", "gatc-requests");
+      addNotification("admin", "GATC Assigned", a.public_id + " assigned to " + g.code + ".", "✅", "admin-applications");
+      saveVerificationWorkflow();
+      alert(a.public_id + " assigned successfully to " + g.code + ".");
+      go("admin-applications");
+    }
+
+    async function adminInspections() {
+      return shell("", '<p class="crumb">Government Dashboard</p><h1>Field Inspections &amp; MPE Testing</h1><p class="intro">Statewide scheduled and completed field test sheets against OIML R 76 tolerances.</p><div class="card"><table class="table"><thead><tr><th>Inspection ID</th><th>Instrument</th><th>Officer</th><th>Scheduled Date</th><th>Status</th><th>Result</th></tr></thead><tbody><tr><td class="mono">INS-8812</td><td><span class="mono">LM-UP-000127</span><div class="tiny">Sharma Kirana</div></td><td>Rahul Sharma</td><td class="mono">2026-08-28</td><td>' + chip("inspection_scheduled") + '</td><td>—</td></tr><tr><td class="mono">INS-8809</td><td><span class="mono">LM-UP-000431</span><div class="tiny">Bharat Fuels #3</div></td><td>Priya Verma</td><td class="mono">2026-08-20</td><td>' + chip("verified") + '</td><td><span class="bad-text">Failed (+1.4e error)</span></td></tr></tbody></table></div>', "admin");
+    }
+
+    async function adminRisk() {
+      return shell("", '<p class="crumb">Government Dashboard · Hero Feature</p><h1>Risk &amp; Enforcement Priority Queue</h1><p class="intro">Prioritize instruments requiring government intervention based on failed inspections, active consumer complaints, and overdue verification status.</p><div class="card"><table class="table"><thead><tr><th>Instrument</th><th>Risk Score</th><th>Risk Factors</th><th>Status</th><th>Recommended Action</th></tr></thead><tbody><tr><td><b>LM-UP-000431</b><div class="tiny">Bharat Fuels Dispenser #3, Lucknow</div></td><td><b style="color:var(--danger)">88 / 100</b><br><span class="chip bad">HIGH RISK</span></td><td>• Failed last inspection<br>• Active consumer complaint<br>• Verification overdue</td><td>' + chip("NON_COMPLIANT") + '</td><td><button class="btn btn-danger" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-assign\', {iid:2})">Immediate Inspection</button></td></tr><tr><td><b>LM-UP-000127</b><div class="tiny">Sharma Kirana Platform Scale</div></td><td><b style="color:var(--warn)">45 / 100</b><br><span class="chip warn">MEDIUM RISK</span></td><td>• Minor seal wire slackness reported</td><td>' + chip("verified") + '</td><td><button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-instrument-detail\', {id:1})">Review File</button></td></tr></tbody></table></div>', "admin");
+    }
+
+    async function adminComplaints() {
+      let cmpRows = "";
+      DB.complaints.forEach(function(c) {
+        cmpRows += '<tr><td class="mono"><b>' + c.id + '</b></td><td class="mono">' + c.serial + '</td><td>' + c.type + '</td><td>' + c.district + '</td><td class="mono">' + c.date + '</td><td><span class="chip bad">' + c.priority + '</span></td><td>' + chip(c.status) + '</td><td>' + c.assigned_officer + '</td></tr>';
+      });
+      return shell("", '<p class="crumb">Government Dashboard</p><h1>Grievance &amp; Complaint Management</h1><p class="intro">Consumer reports regarding short measurements and suspected tampering.</p><div class="card"><table class="table"><thead><tr><th>Complaint ID</th><th>Instrument</th><th>Type</th><th>District</th><th>Date</th><th>Priority</th><th>Status</th><th>Assigned Officer</th></tr></thead><tbody>' + cmpRows + '</tbody></table></div>', "admin");
+    }
+
+    async function adminOfficers() {
+      return shell("", '<p class="crumb">Government Dashboard</p><h1>Officer Workload &amp; Performance</h1><p class="intro">Monitor active inspection workloads across district inspectors.</p><div class="card"><table class="table"><thead><tr><th>Officer Name</th><th>ID / Zone</th><th>District</th><th>Assigned</th><th>Completed</th><th>Pending</th><th>Workload Status</th></tr></thead><tbody><tr><td><b>Rahul Sharma</b></td><td class="mono">LMO-LKO-01</td><td>Lucknow</td><td>24</td><td>18</td><td>6</td><td>' + chip("ok") + ' (Balanced)</td></tr><tr><td><b>Priya Verma</b></td><td class="mono">LMO-LKO-02</td><td>Lucknow</td><td>29</td><td>27</td><td>2</td><td>' + chip("ok") + ' (Optimal)</td></tr><tr><td><b>Manoj Kumar</b></td><td class="mono">LMO-KNP-01</td><td>Kanpur Nagar</td><td>38</td><td>26</td><td>12</td><td>' + chip("warn") + ' (Overloaded)</td></tr></tbody></table></div>', "admin");
+    }
+
+    async function adminAnalytics() {
+      return shell("", '<p class="crumb">Government Dashboard</p><h1>Reports &amp; Analytics</h1><p class="intro">Statewide compliance distribution and inspection success rates.</p><div class="grid-2"><div class="card"><h3>Instruments by District</h3><div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;"><div><div class="row"><span>Lucknow</span><b>4,820</b></div><div class="progress"><span style="width:75%"></span></div></div><div><div class="row"><span>Kanpur Nagar</span><b>3,150</b></div><div class="progress"><span style="width:55%"></span></div></div><div><div class="row"><span>Varanasi</span><b>2,410</b></div><div class="progress"><span style="width:42%"></span></div></div><div><div class="row"><span>Agra</span><b>2,106</b></div><div class="progress"><span style="width:38%"></span></div></div></div></div><div class="card"><h3>Verification Pass vs Failure Ratio</h3><div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;"><div><div class="row"><span class="ok-text">Passed &amp; Certified</span><b>88.4%</b></div><div class="progress"><span style="width:88%;background:var(--green)"></span></div></div><div><div class="row"><span class="bad-text">Failed / Third-party</span><b>8.2%</b></div><div class="progress"><span style="width:8%;background:var(--danger)"></span></div></div><div><div class="row"><span class="warn-text">Expired / Due</span><b>3.4%</b></div><div class="progress"><span style="width:3%;background:var(--warn)"></span></div></div></div></div></div>', "admin");
+    }
+
+    async function adminMap() {
+      setTimeout(function() {
+        if (document.getElementById('map-gov')) {
+          const map = L.map('map-gov').setView([26.8467, 80.9462], 11);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+          DB.instruments.forEach(function(i) {
+            const color = i.oem_status === "third_party" ? "#9c2b1a" : "#1a6b45";
+            const marker = L.circleMarker([i.lat || 26.8467, i.lng || 80.9462], { radius: 10, color: color, fillColor: color, fillOpacity: 0.8 }).addTo(map);
+            marker.bindPopup('<b>' + i.serial + '</b><br>' + i.name + '<br>District: ' + i.district + '<br>Status: ' + i.status);
+          });
+        }
+      }, 100);
+
+      return shell("", '<p class="crumb">Government Dashboard · GIS Intelligence</p><h1>Statewide Enforcement Map</h1><p class="intro">Real-time geographic distribution of weighing instruments and petrol dispensers across Uttar Pradesh.</p><div class="card"><div id="map-gov" style="width:100%;height:520px;border-radius:6px;"></div></div>', "admin");
+    }
+
+    async function verificationApplyView() {
+      if (!S.user || S.user.role !== "user") return go("login-unified");
+      const instOptions = DB.instruments.map(function(i) {
+        return '<option value="' + i.id + '">' + i.serial + ' — ' + i.name + '</option>';
+      }).join("");
+      return shell("", '<p class="crumb">Owner / Trader Portal · Verification</p><h1>Apply for Instrument Verification</h1><p class="intro">Submit your instrument for Legal Metrology verification. Your application will remain <b>Pending</b> until a Metrology Officer reviews and approves it. Only after approval will a verification date and time be scheduled.</p><div class="card" style="max-width:760px;"><div class="field"><label>Instrument</label><select id="verify-instrument">' + instOptions + '</select></div><div class="grid-2"><div class="field"><label>Owner / Trader Name</label><input id="verify-owner" value="' + (S.user.name || "") + '" /></div><div class="field"><label>Business / Establishment</label><input id="verify-org" value="' + (S.user.org || "") + '" /></div></div><div class="grid-2"><div class="field"><label>Contact Number</label><input id="verify-phone" placeholder="10-digit mobile number" /></div><div class="field"><label>Preferred Date (Optional)</label><input id="verify-preferred-date" type="date" /></div></div><div class="field"><label>Additional Information</label><textarea id="verify-notes" rows="4" placeholder="Any details the officer should know about the instrument..."></textarea></div><button class="btn btn-saffron btn-full" onclick="submitVerificationApplication()">Submit Verification Application</button><div id="verify-apply-out" class="mt"></div></div>', "user");
+    }
+
+    function submitVerificationApplication() {
+      const instId = parseInt($("#verify-instrument") ? $("#verify-instrument").value : "1");
+      const inst = DB.instruments.find(function(i) { return i.id === instId; }) || DB.instruments[0];
+      const owner = $("#verify-owner") ? $("#verify-owner").value.trim() : "";
+      const org = $("#verify-org") ? $("#verify-org").value.trim() : "";
+      if (!owner || !org) {
+        $("#verify-apply-out").innerHTML = '<div class="card" style="background:#f8e4df;color:var(--danger);">Please enter the owner/trader name and establishment name.</div>';
+        return;
+      }
+      const nextId = DB.applications.reduce(function(max, a) {
+        const n = parseInt(String(a.public_id || "").replace(/\D/g, "")) || 0;
+        return Math.max(max, n);
+      }, 900) + 1;
+      const appItem = {
+        id: Date.now(),
+        public_id: "APP-2026-" + nextId,
+        workflow: "verification",
+        owner_id: S.user.id,
+        instrument_id: inst.id,
+        kind: "verification",
+        status: "pending",
+        applicant_name: owner,
+        org: org,
+        phone: $("#verify-phone") ? $("#verify-phone").value.trim() : "",
+        preferred_date: $("#verify-preferred-date") ? $("#verify-preferred-date").value : "",
+        notes: $("#verify-notes") ? $("#verify-notes").value.trim() : "",
+        serial: inst.serial,
+        instrument_name: inst.name,
+        district: S.user.district || inst.district,
+        submitted_date: new Date().toISOString().slice(0, 10),
+        assigned_officer: "Unassigned",
+        schedule: null
+      };
+      DB.applications.unshift(appItem);
+      saveVerificationWorkflow();
+      addNotification("officer", "New Verification Application", appItem.applicant_name + " submitted " + appItem.public_id + " for " + appItem.serial + ".", "🔔", "officer-queue");
+      addNotification("user", "Application Submitted", "Your " + appItem.public_id + " is pending officer review.", "📨", "verification-applications");
+      $("#verify-apply-out").innerHTML = '<div class="card" style="background:#e4f2ea;color:var(--green-d);"><b>Application submitted successfully.</b><br>Application ID: <span class="mono">' + appItem.public_id + '</span><br>Status: ' + chip("pending") + '<p class="tiny" style="color:inherit;margin-top:8px;">A Metrology Officer will review your request. The schedule will appear here only after approval.</p></div>';
+      setTimeout(function() { go("verification-applications"); }, 1200);
+    }
+
+    async function verificationApplicationsView() {
+      if (!S.user || S.user.role !== "user") return go("login-unified");
+      const apps = getOwnerApplications();
+      let cards = "";
+      if (!apps.length) {
+        cards = '<div class="card"><h3>No verification applications yet</h3><p class="tiny">Apply for verification and your application will appear here.</p><button class="btn btn-saffron mt" onclick="go(\'verification-apply\')">Apply for Verification</button></div>';
+      } else {
+        apps.forEach(function(a) {
+          const scheduleHtml = a.schedule ? '<div class="card" style="background:#e4f2ea;margin-top:12px;"><h3 style="color:var(--green-d);">Verification Schedule</h3><div class="grid-2"><div><span class="tiny">DATE</span><br><b class="mono">' + a.schedule.date + '</b></div><div><span class="tiny">TIME</span><br><b class="mono">' + a.schedule.time + '</b></div></div><p class="tiny" style="margin-top:10px;color:var(--green-d);">Officer: <b>' + a.schedule.officer + '</b><br>Location: ' + (a.schedule.location || a.org) + '</p></div>' : '';
+          cards += '<div class="card mb"><div class="row"><div><span class="tiny">APPLICATION ID</span><h3 class="mono" style="margin:4px 0;">' + a.public_id + '</h3></div><div>' + chip(a.status) + '</div></div><div class="grid-2" style="margin-top:14px;"><div><span class="tiny">INSTRUMENT</span><br><b>' + a.instrument_name + '</b><div class="mono tiny">' + a.serial + '</div></div><div><span class="tiny">SUBMITTED</span><br><b class="mono">' + a.submitted_date + '</b><div class="tiny">' + a.org + '</div></div></div>' + verificationTimeline(a) + scheduleHtml + '</div>';
+        });
+      }
+      return shell("", '<p class="crumb">Owner / Trader Portal · Applications</p><div class="row"><h1>My Verification Applications</h1><button class="btn btn-saffron right" onclick="go(\'verification-apply\')">+ New Application</button></div><p class="intro">Track approval, instrument testing, and payment status.</p>' + cards, "user");
+    }
+
+    async function officerQueue() {
+      const apps = DB.applications.filter(function(a) { return a.workflow === "verification"; });
+      let rows = "";
+      apps.forEach(function(a) {
+        let action = '';
+        if (a.status === "pending") action = '<button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-review\',{aid:' + a.id + '})">Review</button>';
+        else if (a.status === "approved") action = '<button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-schedule\',{aid:' + a.id + '})">Schedule</button>';
+        else if (a.status === "scheduled") action = '<span class="tiny">Schedule confirmed</span>';
+        else if (a.status === "payment_paid") action = '<span class="tiny ok-text">Payment received</span>';
+        else if (a.status === "payment_pending") action = '<span class="tiny">Awaiting payment</span>';
+        else action = '<span class="tiny">No action</span>';
+        rows += '<tr><td class="mono"><b>' + a.public_id + '</b></td><td><b>' + a.applicant_name + '</b><div class="tiny">' + a.org + '</div></td><td><span class="mono">' + a.serial + '</span><div class="tiny">' + a.instrument_name + '</div></td><td class="mono">' + a.submitted_date + '</td><td>' + chip(a.status) + '</td><td>' + action + '</td></tr>';
+      });
+      if (!rows) rows = '<tr><td colspan="6" style="text-align:center;padding:30px;">No owner/trader verification applications yet.</td></tr>';
+      const pending = apps.filter(function(a){return a.status === "pending";}).length;
+      const approved = apps.filter(function(a){return a.status === "approved";}).length;
+      const scheduled = apps.filter(function(a){return a.status === "scheduled";}).length;
+      return shell("", '<p class="crumb">Metrology Officer Portal · Verification Applications</p><h1>Verification Application Queue</h1><p class="intro">Review owner/trader requests. Approve valid applications first; only approved applications can be scheduled.</p><div class="grid-3 mb">' + kpi(pending,"Pending Review") + kpi(approved,"Approved · Awaiting Schedule") + kpi(scheduled,"Scheduled") + '</div><div class="card"><table class="table"><thead><tr><th>Application</th><th>Owner / Trader</th><th>Instrument</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>', "officer");
+    }
+
+    async function officerReview() {
+      const aid = S.payload.aid;
+      const a = DB.applications.find(function(x) { return x.id === aid && x.workflow === "verification"; });
+      if (!a) return shell("", '<div class="card">Application not found.</div>', "officer");
+      const inst = DB.instruments.find(function(i) { return i.id === a.instrument_id; }) || DB.instruments[0];
+      return shell("", '<p class="crumb">Metrology Officer · Application Review</p><h1>Review Verification Application</h1><p class="intro">Check the owner/trader and instrument details before approving the request.</p><div class="grid-2"><div class="card"><h3>Applicant Details</h3><table class="table"><tr><th>Application ID</th><td class="mono">' + a.public_id + '</td></tr><tr><th>Owner / Trader</th><td>' + a.applicant_name + '</td></tr><tr><th>Establishment</th><td>' + a.org + '</td></tr><tr><th>District</th><td>' + a.district + '</td></tr><tr><th>Contact</th><td class="mono">' + (a.phone || "Not provided") + '</td></tr><tr><th>Submitted</th><td class="mono">' + a.submitted_date + '</td></tr></table></div><div class="card"><h3>Instrument Details</h3><table class="table"><tr><th>Serial</th><td class="mono"><b>' + a.serial + '</b></td></tr><tr><th>Name</th><td>' + a.instrument_name + '</td></tr><tr><th>Manufacturer</th><td>' + inst.manufacturer + '</td></tr><tr><th>Model</th><td>' + inst.model + '</td></tr><tr><th>Type</th><td>' + TYPE_LABEL[inst.type] + '</td></tr><tr><th>Current Registry Status</th><td>' + chip(inst.status) + '</td></tr></table></div></div><div class="card mt"><h3>Officer Decision</h3><p class="tiny">Preferred date from applicant: ' + (a.preferred_date || "Not specified") + '</p><p class="tiny">Notes: ' + (a.notes || "No additional notes") + '</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;"><button class="btn btn-ok" onclick="approveVerificationApplication(' + a.id + ')">✓ Approve Application</button><button class="btn btn-danger" onclick="rejectVerificationApplication(' + a.id + ')">Reject Application</button><button class="btn btn-ghost" onclick="go(\'officer-queue\')">Back to Queue</button></div><div id="review-out" class="mt"></div></div>', "officer");
+    }
+
+    function approveVerificationApplication(aid) {
+      const a = DB.applications.find(function(x) { return x.id === aid && x.workflow === "verification"; });
+      if (!a) return;
+      a.status = "approved";
+      a.approved_by = S.user ? S.user.name : "Metrology Officer";
+      a.approved_at = new Date().toISOString().slice(0, 16).replace("T", " ");
+      a.assigned_officer = S.user ? (S.user.name + " (" + (S.user.lmo_code || "LMO") + ")") : "Metrology Officer";
+      saveVerificationWorkflow();
+      addNotification("user", "Application Approved", a.public_id + " has been approved. Verification can now be scheduled.", "✅", "verification-applications");
+      addNotification("admin", "Application Approved", a.public_id + " was approved by the Metrology Officer.", "✅", "admin-applications");
+      alert("Application " + a.public_id + " approved. Now schedule the verification date and time.");
+      go("officer-schedule", {aid: aid});
+    }
+
+    function rejectVerificationApplication(aid) {
+      const a = DB.applications.find(function(x) { return x.id === aid && x.workflow === "verification"; });
+      if (!a) return;
+      const reason = prompt("Reason for rejection:", "Instrument or applicant details require correction.");
+      if (reason === null) return;
+      a.status = "rejected";
+      a.rejection_reason = reason || "Application details require correction.";
+      a.rejected_by = S.user ? S.user.name : "Metrology Officer";
+      saveVerificationWorkflow();
+      addNotification("user", "Application Rejected", a.public_id + " was rejected. Reason: " + a.rejection_reason, "❌", "verification-applications");
+      alert("Application " + a.public_id + " rejected.");
+      go("officer-queue");
+    }
+
+    async function officerSchedule() {
+      const aid = S.payload.aid;
+      const a = DB.applications.find(function(x) { return x.id === aid && x.workflow === "verification"; });
+      if (!a) return shell("", '<div class="card">Application not found.</div>', "officer");
+      if (a.status !== "approved") return shell("", '<div class="card"><h3>Schedule unavailable</h3><p class="tiny">Only approved applications can be scheduled.</p><button class="btn btn-navy mt" onclick="go(\'officer-queue\')">Back to Queue</button></div>', "officer");
+      const suggested = a.preferred_date || new Date(Date.now() + 86400000).toISOString().slice(0,10);
+      return shell("", '<p class="crumb">Metrology Officer · Schedule Verification</p><h1>Schedule Verification</h1><p class="intro">Application <b class="mono">' + a.public_id + '</b> is approved. Select the date and time for physical instrument verification.</p><div class="card" style="max-width:650px;"><div class="field"><label>Owner / Trader</label><input readonly value="' + a.applicant_name + ' — ' + a.org + '" /></div><div class="field"><label>Instrument</label><input class="mono" readonly value="' + a.serial + ' — ' + a.instrument_name + '" /></div><div class="grid-2"><div class="field"><label>Verification Date</label><input type="date" id="schedule-date" value="' + suggested + '" /></div><div class="field"><label>Verification Time</label><input type="time" id="schedule-time" value="10:30" /></div></div><div class="field"><label>Verification Location</label><input id="schedule-location" value="' + a.org + ', ' + a.district + '" /></div><button class="btn btn-saffron btn-full" onclick="confirmVerificationSchedule(' + a.id + ')">Confirm Schedule</button><div id="schedule-out" class="mt"></div></div>', "officer");
+    }
+
+    function confirmVerificationSchedule(aid) {
+      const a = DB.applications.find(function(x) { return x.id === aid && x.workflow === "verification"; });
+      const date = $("#schedule-date") ? $("#schedule-date").value : "";
+      const time = $("#schedule-time") ? $("#schedule-time").value : "";
+      const location = $("#schedule-location") ? $("#schedule-location").value.trim() : "";
+      if (!a || !date || !time || !location) {
+        if ($("#schedule-out")) $("#schedule-out").innerHTML = '<div class="card" style="background:#f8e4df;color:var(--danger);">Please select date, time and location.</div>';
+        return;
+      }
+      a.status = "scheduled";
+      a.schedule = { date: date, time: time, location: location, officer: S.user ? S.user.name : "Metrology Officer" };
+      a.assigned_officer = S.user ? (S.user.name + " (" + (S.user.lmo_code || "LMO") + ")") : "Metrology Officer";
+      saveVerificationWorkflow();
+      addNotification("user", "Verification Scheduled", a.public_id + " is scheduled for " + date + " at " + time + ".", "📅", "verification-applications");
+      addNotification("admin", "Verification Scheduled", a.public_id + " scheduled for " + date + " at " + time + ".", "📅", "admin-inspections");
+      addNotification("officer", "Schedule Confirmed", a.public_id + " has been scheduled for " + date + " at " + time + ".", "📅", "officer-queue");
+      if ($("#schedule-out")) $("#schedule-out").innerHTML = '<div class="card" style="background:#e4f2ea;color:var(--green-d);"><b>Verification scheduled successfully.</b><br>' + date + ' at ' + time + '<br>Owner/trader can now see the appointment in My Applications.</div>';
+      setTimeout(function() { go("officer-queue"); }, 1400);
+    }
+
+    async function officerHome() {
+      let queueRows = "";
+      DB.applications.forEach(function(a) {
+        queueRows += '<tr><td class="mono">' + a.public_id + '</td><td class="mono">' + a.serial + '</td><td>' + a.org + '</td><td>' + chip(a.status) + '</td><td><button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-inspect\', {iid:' + a.instrument_id + '})">Start Field Test</button></td></tr>';
+      });
+      return shell("", '<p class="crumb">Officer Portal · ' + (S.user?.lmo_code || "LMO-01") + '</p><h1>Inspector Field Desk</h1><p class="intro">Conduct OIML R 76 increasing-load verification tests and record digitally signed inspection results.</p><div class="grid-3 mb">' + kpi(6, "Assigned Inspections") + kpi(18, "Completed This Month") + kpi(1, "Overdue") + '</div><div class="card mb"><h3>Owner / Trader Verification Requests</h3><p class="tiny">Approve applications before assigning a date and time.</p><button class="btn btn-saffron mt" onclick="go(\'officer-queue\')">Open Verification Queue</button></div><div class="card"><h3>My Inspection Queue</h3><table class="table"><thead><tr><th>Application</th><th>Instrument</th><th>Establishment</th><th>Status</th><th>Action</th></tr></thead><tbody>' + queueRows + '</tbody></table></div>', "officer");
+    }
+
+    async function officerInspect() {
+      return shell("", '<p class="crumb">Field Test Sheet · OIML R 76</p><h1>Verification Test Sheet</h1><p class="intro">Record indicated weight at increasing loads and evaluate the inspection result.</p><div class="card" style="max-width:600px;"><div class="field"><label>Instrument Serial</label><input class="mono" readonly value="LM-UP-000127 — Sharma Kirana" /></div><table class="table mb"><thead><tr><th>Applied Load (kg)</th><th>Indicated Weight (kg)</th></tr></thead><tbody><tr><td class="mono">0 kg</td><td><input type="number" value="0.000" class="mono" /></td></tr><tr><td class="mono">50 kg</td><td><input type="number" value="50.002" class="mono" /></td></tr><tr><td class="mono">150 kg</td><td><input type="number" value="150.005" class="mono" /></td></tr><tr><td class="mono">300 kg (Max)</td><td><input type="number" value="300.010" class="mono" /></td></tr></tbody></table><div class="field"><label>Lead Wire &amp; Security Seal Intact?</label><select><option>Yes — Sealed securely</option><option>No — Broken / Tampered</option></select></div><div class="field"><label>Inspection Verdict</label><select id="insp-verdict"><option value="pass">PASS &amp; STAMP</option><option value="fail">FAIL / REJECT</option></select></div><button class="btn btn-ok btn-full" onclick="submitOfficerInspection()">Submit Inspection Result</button><div id="insp-out" class="mt"></div></div>', "officer");
+    }
+    function submitOfficerInspection() {
+      const verdict = $("#insp-verdict") ? $("#insp-verdict").value : "pass";
+      if (verdict === "pass") {
+        $("#insp-out").innerHTML = '<div class="card" style="background:#e4f2ea;color:var(--green-d);">Inspection successfully completed. <b>Instrument passed OIML R 76 checks.</b> Result recorded in the audit ledger.</div>';
+      } else {
+        $("#insp-out").innerHTML = '<div class="card" style="background:#f8e4df;color:var(--danger);">Inspection recorded as <b>FAIL / REJECT</b>. Instrument has been flagged for enforcement follow-up.</div>';
+      }
+    }
+
+
+    function currentGatc() {
+      const id = S.user && S.user.gatc_id ? S.user.gatc_id : 21;
+      return DB.gatcs.find(function(g) { return g.id === id; }) || DB.gatcs[0];
+    }
+
+    // GATC is a Government Approved TEST Centre: it tests only instruments assigned to it.
+    function gatcApps() {
+      const g = currentGatc();
+      return DB.applications.filter(function(a) { return Number(a.gatc_id) === Number(g.id); });
+    }
+
+    function gatcAssignedApps() {
+      return gatcApps().filter(function(a) { return !a.gatc_tested_on || a.status === "scheduled" || a.status === "gatc_assigned" || a.status === "in_progress"; });
+    }
+
+    function gatcEligibleForInstrument(inst) {
+      const g = currentGatc();
+      if (!inst || !g) return false;
+      const category = TYPE_LABEL[inst.type] || inst.type;
+      return g.authorized.some(function(x) {
+        return x.toLowerCase() === category.toLowerCase() ||
+               x.toLowerCase().replace(" dispenser", "") === category.toLowerCase().replace(" dispenser", "");
+      });
+    }
+
+    function gatcTestResultLabel(a) {
+      if (a.gatc_test_result === "pass") return "Passed";
+      if (a.gatc_test_result === "fail") return "Failed";
+      return "Pending";
+    }
+
+    function gatcStatus(status) {
+      const cls = status === "in_progress" ? "in_progress" : status === "scheduled" ? "scheduled" : status === "pending" ? "pending" : status === "failed" ? "failed" : "completed";
+      const label = status === "in_progress" ? "In Progress" : status === "certificate_generated" ? "Completed" : String(status || "Pending").replace(/_/g," ");
+      return '<span class="gatc-status ' + cls + '">' + label.charAt(0).toUpperCase() + label.slice(1) + '</span>';
+    }
+
+    async function gatcHome() {
+      const g = currentGatc();
+      const apps = gatcApps();
+      const assigned = apps.filter(function(a){ return !a.gatc_tested_on || a.status === "scheduled" || a.status === "gatc_assigned" || a.status === "in_progress"; });
+      const today = new Date().toISOString().slice(0,10);
+      const todayTests = apps.filter(function(a){ return a.schedule && a.schedule.date === today; }).length;
+      const pending = assigned.filter(function(a){ return !a.gatc_test_result; }).length;
+      const passed = apps.filter(function(a){ return a.gatc_test_result === "pass"; }).length;
+      const failed = apps.filter(function(a){ return a.gatc_test_result === "fail"; }).length;
+      const recent = apps.slice(0,5);
+      const requestRows = recent.map(function(a){
+        const result = gatcTestResultLabel(a);
+        const resultHtml = result === "Passed" ? '<span class="gatc-status completed">Passed</span>' : result === "Failed" ? '<span class="gatc-status failed">Failed</span>' : '<span class="gatc-status pending">Pending Test</span>';
+        return '<tr><td class="mono"><b>' + a.public_id + '</b></td><td>' + a.instrument_name + '<div class="tiny">' + a.serial + '</div></td><td>' + (a.org || a.applicant_name || "—") + '</td><td>' + resultHtml + '</td><td>' + (a.schedule ? (a.schedule.date + '<br>' + a.schedule.time) : "—") + '</td></tr>';
+      }).join("");
+      const scheduledApps = apps.filter(function(a){ return a.schedule && !a.gatc_tested_on; });
+      const scheduleItems = scheduledApps.slice(0,3).map(function(a, idx){
+        const time = a.schedule && a.schedule.time ? a.schedule.time : (idx === 0 ? "11:00 AM" : idx === 1 ? "02:30 PM" : "04:30 PM");
+        return '<div class="gatc-schedule-item"><div class="gatc-time">' + time + '</div><div><b>' + (a.org || a.applicant_name || "Test appointment") + '</b><p>' + a.instrument_name + ' · ' + a.serial + '<br>' + a.public_id + '</p></div><button class="btn btn-navy" style="padding:6px 9px;font-size:9px;" onclick="go(\'gatc-test\',{aid:' + a.id + '})">Start Test</button></div>';
+      }).join("");
+
+      return shell("", '<div class="gatc-page-head"><div><h1>GATC Dashboard</h1><p>Welcome back, ' + (g.name || "Government Approved Test Centre") + '</p></div><div class="gatc-date">▣ &nbsp; 28 August 2026, Thursday</div></div>' +
+        '<div class="gatc-kpi-grid">' +
+          '<div class="gatc-kpi-card"><div class="kpi-icon">▤</div><b>' + assigned.length + '</b><span>Assigned Instruments</span><small>Instruments assigned for testing</small></div>' +
+          '<div class="gatc-kpi-card warn"><div class="kpi-icon">◷</div><b>' + todayTests + '</b><span>Today’s Tests</span><small>Scheduled for today</small></div>' +
+          '<div class="gatc-kpi-card ok"><div class="kpi-icon">▣</div><b>' + pending + '</b><span>Pending Tests</span><small>Awaiting instrument testing</small></div>' +
+          '<div class="gatc-kpi-card purple"><div class="kpi-icon">✓</div><b>' + passed + '</b><span>Tests Passed</span><small>Successful test results</small></div>' +
+          '<div class="gatc-kpi-card danger"><div class="kpi-icon">×</div><b>' + failed + '</b><span>Tests Failed</span><small>Failed test results</small></div>' +
+        '</div>' +
+        '<div class="gatc-two-col">' +
+          '<section class="gatc-panel"><div class="gatc-panel-head"><h3>Assigned Instruments</h3><button class="gatc-link" onclick="go(\'gatc-requests\')">View all →</button></div><div class="gatc-table-wrap"><table class="gatc-table"><thead><tr><th>Application ID</th><th>Instrument</th><th>Owner</th><th>Test Status</th><th>Scheduled On</th></tr></thead><tbody>' + (requestRows || '<tr><td colspan="5">No instruments assigned.</td></tr>') + '</tbody></table></div></section>' +
+          '<section class="gatc-panel"><div class="gatc-panel-head"><h3>Today’s Test Schedule</h3><button class="gatc-link" onclick="go(\'gatc-schedule\')">View schedule →</button></div><div class="gatc-schedule-list">' + (scheduleItems || '<div style="padding:18px 8px;color:#7b8797;font-size:11px;">No tests scheduled.</div>') + '</div></section>' +
+        '</div>' +
+        '<div class="gatc-bottom-grid">' +
+          '<section class="gatc-panel"><div class="gatc-panel-head"><h3>Test Summary</h3></div><div class="gatc-summary"><div class="gatc-donut"></div><div class="gatc-legend"><div><i></i>Passed <b>' + passed + '</b></div><div class="fail"><i></i>Failed <b>' + failed + '</b></div><div class="pend"><i></i>Pending <b>' + pending + '</b></div></div></div></section>' +
+          '<section class="gatc-panel"><div class="gatc-panel-head"><h3>Quick Actions</h3></div><div class="gatc-actions"><div class="gatc-action-grid">' +
+            '<button class="gatc-action-card" onclick="go(\'gatc-requests\')"><div class="aicon">▤</div><b>Assigned Instruments</b><span>View instruments assigned for testing</span></button>' +
+            '<button class="gatc-action-card" onclick="go(\'gatc-schedule\')"><div class="aicon">▣</div><b>Test Schedule</b><span>View upcoming instrument tests</span></button>' +
+            '<button class="gatc-action-card" onclick="go(\'gatc-results\')"><div class="aicon">☑</div><b>Test Results</b><span>Review submitted test results</span></button>' +
+            '<button class="gatc-action-card" onclick="go(\'gatc-history\')"><div class="aicon">◷</div><b>Test History</b><span>View instrument testing history</span></button>' +
+          '</div></div></section>' +
+        '</div>', "gatc");
+    }
+
+    async function gatcRequests() {
+      const apps = gatcApps();
+      const rows = apps.map(function(a){
+        const inst = DB.instruments.find(function(i){ return i.id === a.instrument_id; });
+        const eligible = gatcEligibleForInstrument(inst);
+        const tested = !!a.gatc_tested_on;
+        return '<tr><td class="mono"><b>' + a.public_id + '</b></td><td>' + a.applicant_name + '<div class="tiny">' + a.org + '</div></td><td>' + a.instrument_name + '<div class="tiny mono">' + a.serial + '</div></td><td>' + (eligible ? '<span class="chip ok">Authorized</span>' : '<span class="chip bad">Not Authorized</span>') + '<div class="tiny mt">' + (tested ? '<span class="chip ' + (a.gatc_test_result === "fail" ? "bad" : "ok") + '">' + gatcTestResultLabel(a) + '</span>' : '<span class="chip warn">Pending Test</span>') + '</div></td><td><button class="btn btn-navy gatc-action" ' + (!eligible || tested ? 'disabled title="Only authorized and untested assigned instruments can be tested"' : '') + ' onclick="go(\'gatc-test\',{aid:' + a.id + '})">Start Test</button></td></tr>';
+      }).join("");
+      return shell("", '<p class="crumb">GATC Portal · Assigned Instruments</p><h1>Assigned Instruments</h1><p class="intro">This centre can test only instruments assigned to it. Open an assigned instrument to record its test readings, evidence and PASS/FAIL result.</p><div class="card"><table class="table"><thead><tr><th>Application</th><th>Applicant</th><th>Instrument</th><th>Authorization / Test Status</th><th>Action</th></tr></thead><tbody>' + (rows || '<tr><td colspan="5" class="tiny">No instruments assigned to this GATC.</td></tr>') + '</tbody></table></div>', "gatc");
+    }
+
+    async function gatcSchedule() {
+      const apps = gatcApps().filter(function(a){ return a.schedule && !a.gatc_tested_on; });
+      const rows = apps.map(function(a){ return '<tr><td class="mono">' + a.schedule.date + '<br>' + a.schedule.time + '</td><td><b>' + a.org + '</b><div class="tiny">' + a.schedule.location + '</div></td><td>' + a.instrument_name + '<div class="tiny mono">' + a.serial + '</div></td><td>' + (a.gatc_test_result ? '<span class="chip ok">Tested</span>' : '<span class="chip warn">Pending Test</span>') + '</td><td><button class="btn btn-navy" onclick="go(\'gatc-test\',{aid:' + a.id + '})">Start Test</button></td></tr>'; }).join("");
+      return shell("", '<p class="crumb">GATC Portal · Test Schedule</p><h1>Test Schedule</h1><p class="intro">Upcoming instrument tests assigned to your Government Approved Test Centre.</p><div class="card"><table class="table"><thead><tr><th>Date / Time</th><th>Establishment</th><th>Instrument</th><th>Status</th><th>Action</th></tr></thead><tbody>' + (rows || '<tr><td colspan="5" class="tiny">No upcoming tests.</td></tr>') + '</tbody></table></div>', "gatc");
+    }
+
+    async function gatcTest() {
+      const aid = S.payload.aid || (gatcApps()[0] && gatcApps()[0].id);
+      const a = DB.applications.find(function(x){ return x.id === aid && Number(x.gatc_id) === Number(currentGatc().id); });
+      if (!a) return shell("", '<div class="card"><h3>Assigned instrument not found</h3><button class="btn btn-navy mt" onclick="go(\'gatc-requests\')">Back to Assigned Instruments</button></div>', "gatc");
+      const inst = DB.instruments.find(function(i){ return i.id === a.instrument_id; });
+      const authorized = gatcEligibleForInstrument(inst);
+      return shell("", '<p class="crumb">GATC Portal · Instrument Test</p><div class="row"><div><h1>Instrument Test Desk</h1><p class="intro">GATC performs the instrument test only. The assigned instrument must be tested and the result submitted to the government workflow.</p></div>' + (authorized ? '<span class="chip ok">✓ CATEGORY AUTHORIZED</span>' : '<span class="chip bad">✕ CATEGORY NOT AUTHORIZED</span>') + '</div><div class="grid-2"><div><div class="card"><h3>Assigned Instrument</h3><table class="table"><tr><th>Application</th><td class="mono">' + a.public_id + '</td></tr><tr><th>Instrument</th><td>' + a.instrument_name + '</td></tr><tr><th>Serial</th><td class="mono">' + a.serial + '</td></tr><tr><th>Owner</th><td>' + a.applicant_name + '</td></tr><tr><th>Establishment</th><td>' + a.org + '</td></tr><tr><th>Location</th><td>' + a.district + '</td></tr><tr><th>Scheduled Test</th><td>' + (a.schedule ? a.schedule.date + ' · ' + a.schedule.time : 'Not scheduled') + '</td></tr></table></div><div class="card"><h3>Instrument Information</h3><p class="tiny">Manufacturer: ' + (inst ? inst.manufacturer : "—") + ' · Model: ' + (inst ? inst.model : "—") + '</p><p class="tiny">Current status: ' + (inst ? chip(inst.status) : "—") + '</p></div></div><div class="card"><h3>Instrument Test</h3><div class="gatc-check-grid"><div class="gatc-check-item"><label>Instrument Identification</label><select id="gatc-ident"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Seal Inspection</label><select id="gatc-seal"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Measurement Accuracy</label><select id="gatc-accuracy"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Display / Nozzle Inspection</label><select id="gatc-display"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div></div><div class="field mt"><label>Test Readings</label><textarea id="gatc-readings" rows="4" placeholder="Enter measured readings, applied loads, observed values or other test readings..."></textarea></div><div class="gatc-evidence mt"><label style="display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:7px;">Photo / Evidence</label><input id="gatc-evidence" type="file" accept="image/*,.pdf" multiple></div><div class="field mt"><label>Test Result</label><select id="gatc-verdict"><option value="pass">PASS</option><option value="fail">FAIL</option></select></div><div class="field"><label>Remarks</label><textarea id="gatc-remarks" rows="3" placeholder="Add test remarks..."></textarea></div><button class="btn btn-ok btn-full" ' + (!authorized ? 'disabled title="GATC is not authorized for this instrument category"' : '') + ' onclick="submitGatcTest(' + a.id + ')">Submit Test Result</button><div id="gatc-result-out" class="mt"></div></div></div>', "gatc");
+    }
+
+    function submitGatcTest(aid) {
+      const a = DB.applications.find(function(x){ return x.id === aid && Number(x.gatc_id) === Number(currentGatc().id); });
+      if (!a) return;
+      const inst = DB.instruments.find(function(i){ return i.id === a.instrument_id; });
+      if (!gatcEligibleForInstrument(inst)) {
+        const out = $("#gatc-result-out");
+        if (out) out.innerHTML = '<div class="card" style="background:#f8e4df;color:var(--danger);"><b>Test blocked.</b><br>This GATC is not authorized for the instrument category.</div>';
+        return;
+      }
+      const verdict = $("#gatc-verdict") ? $("#gatc-verdict").value : "pass";
+      const remarks = $("#gatc-remarks") ? $("#gatc-remarks").value.trim() : "";
+      const readings = $("#gatc-readings") ? $("#gatc-readings").value.trim() : "";
+      const evidence = $("#gatc-evidence") && $("#gatc-evidence").files ? Array.from($("#gatc-evidence").files).map(function(f){ return f.name; }) : [];
+      const checks = {
+        identification: $("#gatc-ident") ? $("#gatc-ident").value : "pass",
+        seal: $("#gatc-seal") ? $("#gatc-seal").value : "pass",
+        accuracy: $("#gatc-accuracy") ? $("#gatc-accuracy").value : "pass",
+        display: $("#gatc-display") ? $("#gatc-display").value : "pass"
+      };
+      a.gatc_test_result = verdict;
+      a.gatc_test_checks = checks;
+      a.gatc_test_readings = readings;
+      a.gatc_test_evidence = evidence;
+      a.gatc_test_remarks = remarks;
+      a.gatc_tested_on = new Date().toISOString();
+      a.gatc_tested_by = S.user ? S.user.name : "GATC Operator";
+      a.status = verdict === "pass" ? "payment_pending" : "failed";
+      if (inst && verdict === "pass") { inst.status = "tested"; inst.last_tested = a.gatc_tested_on.slice(0,10); }
+      if (inst && verdict === "fail") { inst.status = "test_failed"; }
+      persistInstrument(inst);
+      addNotification("admin", verdict === "pass" ? "GATC Test Passed" : "GATC Test Failed", a.public_id + " test result submitted by " + currentGatc().code + ".", verdict === "pass" ? "✅" : "⚠️", "admin-inspections");
+      addNotification("gatc", "Test Result Submitted", a.public_id + " has been recorded as " + (verdict === "pass" ? "PASS" : "FAIL") + ".", verdict === "pass" ? "✅" : "⚠️", "gatc-results", {aid: aid});
+      if ($("#gatc-result-out")) $("#gatc-result-out").innerHTML = '<div class="card" style="background:' + (verdict === "pass" ? '#e4f2ea;color:var(--green-d);' : '#f8e4df;color:var(--danger);') + '"><b>Instrument Test ' + (verdict === "pass" ? 'Passed ✓' : 'Failed') + '</b><br>Test result submitted to the government workflow. No certificate is generated by GATC.</div>';
+      saveVerificationWorkflow();
+    }
+
+    function verificationFeeForApplication(a) {
+      const inst = DB.instruments.find(function(i){ return i.id === a.instrument_id; });
+      const type = inst ? String(TYPE_LABEL[inst.type] || inst.type || "").toLowerCase() : "";
+      let perUnit = 1000;
+      if (type.indexOf("cng") !== -1 || type.indexOf("lpg") !== -1 || type.indexOf("lng") !== -1 || type.indexOf("hydrogen") !== -1) perUnit = 10000;
+      else if (type.indexOf("petrol") !== -1 || type.indexOf("diesel") !== -1) perUnit = 5000;
+      const units = inst && Number(inst.nozzles) > 0 ? Number(inst.nozzles) : 1;
+      return perUnit * units;
+    }
+
+    function openVerificationPayment(aid) {
+      const a = DB.applications.find(function(x){ return x.id === aid && x.workflow === "verification"; });
+      if (!a || (a.status !== "completed" && a.status !== "payment_pending")) return;
+      const amount = verificationFeeForApplication(a);
+      const existing = document.getElementById("verification-payment-modal");
+      if (existing) existing.remove();
+      document.body.insertAdjacentHTML("beforeend", '<div id="verification-payment-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.58);display:grid;place-items:center;z-index:10001;padding:18px;"><div class="card" style="width:100%;max-width:520px;background:#fff;"><div class="row"><h3 style="margin:0;">Verification Payment</h3><button class="btn btn-ghost right" onclick="document.getElementById(\'verification-payment-modal\').remove()">×</button></div><p class="tiny">Application <b class="mono">' + a.public_id + '</b></p><table class="table"><tr><th>Instrument</th><td>' + a.instrument_name + '</td></tr><tr><th>Serial</th><td class="mono">' + a.serial + '</td></tr><tr><th>Amount</th><td><b>₹' + amount.toLocaleString("en-IN") + '</b></td></tr></table><div style="background:#f6f8fb;border:1px solid #e1e7ed;border-radius:8px;padding:12px;font-size:12px;color:#66758a;">Demo payment screen — no real money is charged.</div><button class="btn btn-saffron btn-full mt" onclick="completeVerificationPayment(' + a.id + ',' + amount + ')">Pay ₹' + amount.toLocaleString("en-IN") + '</button></div></div>');
+    }
+
+    function completeVerificationPayment(aid, amount) {
+      const a = DB.applications.find(function(x){ return x.id === aid && x.workflow === "verification"; });
+      if (!a) return;
+      a.payment = { status: "paid", amount: amount, paid_on: new Date().toISOString(), payment_id: "PAY-" + Date.now() };
+      a.status = "payment_paid";
+      saveVerificationWorkflow();
+      addNotification("officer", "Payment Received", a.public_id + " payment received. Application is ready for the next processing stage.", "💳", "officer-queue");
+      addNotification("user", "Payment Received", "Payment for " + a.public_id + " was received. Your application has moved to the next processing stage.", "💳", "verification-applications", {aid:aid});
+      const modal = document.getElementById("verification-payment-modal");
+      if (modal) modal.remove();
+      alert("Payment received successfully. Your application has moved to the next processing stage.");
+      go("verification-applications");
+    }
+
+    async function gatcResults() {
+      const apps = gatcApps().filter(function(a){ return !!a.gatc_tested_on; });
+      const rows = apps.map(function(a){
+        return '<tr><td class="mono"><b>' + a.public_id + '</b></td><td>' + a.instrument_name + '<div class="tiny mono">' + a.serial + '</div></td><td>' + (a.gatc_tested_on || '—') + '</td><td>' + (a.gatc_test_result === "pass" ? '<span class="chip ok">PASS</span>' : '<span class="chip bad">FAIL</span>') + '</td><td>' + (a.gatc_tested_by || 'GATC Operator') + '</td><td><button class="btn btn-navy" style="padding:6px 10px;font-size:11px;" onclick="go(\'gatc-test\',{aid:' + a.id + '})">View</button></td></tr>';
+      }).join("");
+      return shell("", '<p class="crumb">GATC Portal · Test Results</p><h1>Test Results</h1><p class="intro">Results submitted by this GATC for instruments assigned to the centre.</p><div class="card"><table class="table"><thead><tr><th>Application</th><th>Instrument</th><th>Tested On</th><th>Result</th><th>Tested By</th><th>Action</th></tr></thead><tbody>' + (rows || '<tr><td colspan="6" class="tiny">No test results submitted yet.</td></tr>') + '</tbody></table></div>', "gatc");
+    }
+
+    async function gatcHistory() {
+      const apps = gatcApps();
+      const grouped = {};
+      apps.forEach(function(a){
+        const key = a.serial || a.instrument_id;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(a);
+      });
+      let cards = "";
+      Object.keys(grouped).forEach(function(key){
+        const history = grouped[key].sort(function(x,y){ return String(x.gatc_tested_on || x.submitted_date || '').localeCompare(String(y.gatc_tested_on || y.submitted_date || '')); });
+        const latest = history[history.length-1];
+        cards += '<div class="card"><div class="row"><div><h3 style="margin-bottom:4px;">' + latest.instrument_name + '</h3><div class="tiny mono">' + latest.serial + ' · ' + latest.org + '</div></div><span class="right">' + (latest.gatc_test_result === "pass" ? '<span class="chip ok">PASS</span>' : latest.gatc_test_result === "fail" ? '<span class="chip bad">FAIL</span>' : '<span class="chip warn">PENDING</span>') + '</span></div><div style="margin-top:14px;">' + history.map(function(a){
+          const when = a.gatc_tested_on ? a.gatc_tested_on.slice(0,10) : (a.submitted_date || '—');
+          const result = a.gatc_test_result === "pass" ? '✓ Passed' : a.gatc_test_result === "fail" ? '✗ Failed' : 'Pending Test';
+          return '<div style="padding:10px 0;border-top:1px solid #edf0f3;"><b>' + result + '</b><span class="tiny right">' + when + '</span><div class="tiny">' + (a.gatc_test_remarks || 'No remarks recorded') + '</div></div>';
+        }).join("") + '</div></div>';
+      });
+      return shell("", '<p class="crumb">GATC Portal · Test History</p><h1>Test History</h1><p class="intro">Instrument lifecycle history for tests performed by this GATC.</p>' + (cards || '<div class="card"><p class="tiny">No assigned instrument history available.</p></div>'), "gatc");
+    }
+
+    async function gatcNotifications() {
+      const notes = getNotificationsForCurrentUser();
+      const rows = notes.map(function(n){ return '<div class="card" style="margin-bottom:10px;cursor:pointer;" onclick="openNotification(' + n.id + ',\'' + (n.view || '') + '\')"><div class="row"><b style="color:var(--navy);">' + (n.icon || '🔔') + ' &nbsp;' + n.title + '</b><span class="tiny right">' + (n.time || '') + '</span></div><p class="tiny" style="margin:7px 0 0;">' + n.message + '</p></div>'; }).join("");
+      return shell("", '<p class="crumb">GATC Portal · Notifications</p><div class="row"><div><h1>Notifications</h1><p class="intro">Alerts and updates for instruments assigned to this GATC.</p></div><button class="btn btn-navy right" onclick="markNotificationsRead();render();">Mark all read</button></div>' + (rows || '<div class="card"><p class="tiny">No notifications.</p></div>'), "gatc");
+    }
+
+    async function guidelinesView() {
+      const g = await api("/api/guidelines");
+      let inner = "";
+      g.guidelines.forEach(function(x) {
+        inner += '<article class="card mb"><div class="crumb">' + x.jurisdiction + ' · ' + x.id + '</div><h3 style="font-family:var(--serif);margin-bottom:6px;">' + x.title + '</h3><p>' + x.body + '</p><p class="tiny mt">' + x.refs.join(" · ") + '</p></article>';
+      });
+      const body = '<p class="crumb">Rule Library</p><h1>Indian Legal Metrology &amp; OIML Standards</h1><p class="intro">PRAMĀṆA enforces the Legal Metrology Act, 2009, General Rules 2011, and international OIML R 76 / R 60 recommendations.</p><div class="grid-2"><div>' + inner + '</div><div><div class="card mb"><h3>Rule 27 Re-verification Intervals</h3><table class="table"><tr><th>Electronic Weighing / Platform Scale</th><td>12 Months</td></tr><tr><th>Weighbridges</th><td>12 Months</td></tr><tr><th>Fuel Dispensers</th><td>12 Months</td></tr><tr><th>Counter Machines</th><td>24 Months</td></tr><tr><th>Tape Measures</th><td>60 Months</td></tr></table></div></div></div>';
+      if (S.user) return shell("", body, S.user.role);
+      return '<div class="hero">' + topPublic() + body + '</div>';
+    }
+
+    function toggleChat() {
+      const box = document.getElementById("chatbot-box");
+      box.classList.toggle("open");
+    }
+
+    async function sendChatMessage() {
+      const input = document.getElementById("chat-input");
+      const text = input.value.trim();
+      if (!text) return;
+      const msgs = document.getElementById("chatbot-messages");
+      msgs.innerHTML += '<div class="chat-msg user">' + text + '</div>';
+      input.value = "";
+      msgs.scrollTop = msgs.scrollHeight;
+
+      setTimeout(function() {
+        let reply = "Namaste! I can assist you with verification intervals, MPE tolerances, and OIML standards.";
+        const low = text.toLowerCase();
+        if (low.indexOf("fee") !== -1 || low.indexOf("charge") !== -1) {
+          reply = "Verification fees under Rule 13 depend on the instrument capacity (e.g. ₹200 for counter scales up to 50kg, ₹2000 for weighbridges up to 50 tonnes).";
+        } else if (low.indexOf("interval") !== -1 || low.indexOf("due") !== -1 || low.indexOf("expire") !== -1) {
+          reply = "As per Rule 27, electronic weighing instruments, platform scales, and fuel dispensers require re-verification every 12 months.";
+        } else if (low.indexOf("mpe") !== -1 || low.indexOf("tolerance") !== -1) {
+          reply = "For Class III NAWI scales, verification MPE is ±0.5e up to 500e, ±1.0e from 500e to 2000e, and ±1.5e above 2000e.";
+        } else if (low.indexOf("complaint") !== -1 || low.indexOf("report") !== -1) {
+          reply = "You can report a suspected short measurement or tampered lead seal using the 'Report an Issue' button on the Consumer Dashboard.";
+        }
+        msgs.innerHTML += '<div class="chat-msg bot">' + reply + '</div>';
+        msgs.scrollTop = msgs.scrollHeight;
+      }, 500);
+    }
+
+    const VIEWS = {
+      landing: landing,
+      "login-unified": unifiedLoginView,
+      "scan-lab": scanLabView,
+      "public-result": publicResultView,
+      guidelines: guidelinesView,
+      "consumer-home": consumerHome,
+      "consumer-instruments": consumerInstrumentsView,
+      "verification-apply": verificationApplyView,
+      "verification-applications": verificationApplicationsView,
+      "fee-payment": feePaymentView,
+      "consumer-nearby": consumerNearby,
+      "consumer-complaints": consumerComplaintsView,
+      "admin-home": adminHome,
+      "admin-registry": adminRegistry,
+      "admin-instrument-detail": adminInstrumentDetail,
+      "admin-applications": adminApplications,
+      "admin-gatc-network": adminGatcNetwork,
+      "admin-gatc-assign": adminGatcAssign,
+      "admin-assign": adminAssign,
+      "admin-inspections": adminInspections,
+      "admin-risk": adminRisk,
+      "admin-complaints": adminComplaints,
+      "admin-officers": adminOfficers,
+      "admin-analytics": adminAnalytics,
+      "admin-map": adminMap,
+      "officer-home": officerHome,
+      "officer-queue": officerQueue,
+      "officer-review": officerReview,
+      "officer-schedule": officerSchedule,
+      "officer-inspect": officerInspect,
+      "gatc-home": gatcHome,
+      "gatc-requests": gatcRequests,
+      "gatc-schedule": gatcSchedule,
+      "gatc-test": gatcTest,
+      "gatc-results": gatcResults,
+      "gatc-history": gatcHistory,
+      "gatc-notifications": gatcNotifications,
+    };
+
+    async function render() {
+      const fn = VIEWS[S.view] || VIEWS.landing;
+      try {
+        const html = await fn();
+        app.innerHTML = html;
+        bindPhotoCheckEvents();
+      } catch (e) {
+        app.innerHTML = '<div class="hero">' + topPublic() + '<div class="err">' + e.message + '</div></div>';
+      }
+    }
+
+    (async function boot() {
+      const h = location.hash.replace("#", "");
+      if (h) S.view = h;
+      try {
+        const bootstrap = await api("/api/bootstrap");
+        if (Array.isArray(bootstrap.instruments)) DB.instruments = bootstrap.instruments;
+        if (Array.isArray(bootstrap.applications)) DB.applications = bootstrap.applications;
+        if (Array.isArray(bootstrap.complaints)) DB.complaints = bootstrap.complaints;
+        if (Array.isArray(bootstrap.certificates)) DB.certificates = bootstrap.certificates;
+        if (Array.isArray(bootstrap.audit)) DB.audit = bootstrap.audit;
+        if (Array.isArray(bootstrap.notifications)) DB.notifications = bootstrap.notifications;
+      } catch (e) {}
+      try {
+        const me = await api("/api/me");
+        S.user = me.user;
+      } catch (e) {}
+      render();
+    })();
+  
+    // Direct QR scanner + OCR.
+    let CAMERA_STREAM = null;
+    let QR_SCAN_ACTIVE = false;
+    let QR_SCAN_TIMER = null;
+
+    function openScanner() {
+      if (typeof S !== "undefined") S.view = "scan-lab";
+      if (typeof render === "function") render();
+      setTimeout(function(){ openCamera(); }, 60);
+    }
+
+    async function openCamera() {
+      const modal = document.getElementById("camera-modal");
+      const video = document.getElementById("camera-video");
+      const status = document.getElementById("camera-status");
+      const captureBtn = document.getElementById("capture-camera-btn");
+      if (!modal || !video) return;
+
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden","false");
+      if (captureBtn) captureBtn.disabled = true;
+      if (status) status.textContent = "Requesting camera permission…";
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Live camera is unavailable here. Open PRAMĀṆA on localhost or HTTPS.");
+        }
+
+        stopCameraStream();
+        CAMERA_STREAM = await navigator.mediaDevices.getUserMedia({
+          video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},
+          audio:false
+        });
+
+        video.srcObject = CAMERA_STREAM;
+        await video.play();
+        if (status) status.textContent = "Point at a QR code or nameplate";
+        if (captureBtn) captureBtn.disabled = false;
+        startQrDetection(video);
+      } catch(err) {
+        console.error("Scanner camera error:", err);
+        let message = "Camera could not be opened.";
+        if (err && err.name === "NotAllowedError") message = "Camera permission is blocked. Allow camera access for this site.";
+        else if (err && err.name === "NotFoundError") message = "No camera was found on this device.";
+        else if (err && err.name === "NotReadableError") message = "Camera is busy in another app.";
+        else if (err && err.message) message = err.message;
+        if (status) status.textContent = message;
+      }
+    }
+
+    function startQrDetection(video) {
+      stopQrDetection();
+      QR_SCAN_ACTIVE = true;
+      if (!("BarcodeDetector" in window)) {
+        const status = document.getElementById("camera-status");
+        if (status) status.textContent = "QR auto-scan unavailable. Capture the nameplate to read text.";
+        return;
+      }
+
+      let detector;
+      try { detector = new BarcodeDetector({formats:["qr_code"]}); }
+      catch(e) {
+        const status = document.getElementById("camera-status");
+        if (status) status.textContent = "QR scanner unavailable. Capture the nameplate to read text.";
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d",{willReadFrequently:true});
+
+      async function scanFrame() {
+        if (!QR_SCAN_ACTIVE || !video.videoWidth) return;
+        const scale = Math.min(1,720/video.videoWidth);
+        canvas.width = Math.max(1,Math.round(video.videoWidth*scale));
+        canvas.height = Math.max(1,Math.round(video.videoHeight*scale));
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        try {
+          const codes = await detector.detect(canvas);
+          if (codes && codes.length) {
+            const raw = (codes[0].rawValue || "").trim();
+            if (raw) { handleScannedValue(raw); return; }
+          }
+        } catch(e) {}
+        if (QR_SCAN_ACTIVE) QR_SCAN_TIMER = requestAnimationFrame(scanFrame);
+      }
+      QR_SCAN_TIMER = requestAnimationFrame(scanFrame);
+    }
+
+    function stopQrDetection() {
+      QR_SCAN_ACTIVE = false;
+      if (QR_SCAN_TIMER) {
+        cancelAnimationFrame(QR_SCAN_TIMER);
+        QR_SCAN_TIMER = null;
+      }
+    }
+
+    function handleScannedValue(raw) {
+      stopQrDetection();
+      let query = raw;
+      try {
+        const url = new URL(raw);
+        query = url.searchParams.get("q") || url.searchParams.get("serial") || url.searchParams.get("id") || raw;
+      } catch(e) {}
+      closeCamera();
+      if (typeof go === "function") go("public-result",{q:query});
+    }
+
+    function captureCameraPhoto() {
+      const video = document.getElementById("camera-video");
+      if (!video || !video.videoWidth || !video.videoHeight) return;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+
+      canvas.toBlob(function(blob) {
+        if (!blob) return;
+        const file = new File([blob],"camera-nameplate.jpg",{type:"image/jpeg"});
+        const previewUrl = URL.createObjectURL(blob);
+        stopQrDetection();
+        runOCR(file);
+        setPhotoFile(file,previewUrl);
+        const status = document.getElementById("camera-status");
+        if (status) status.textContent = "Photo captured · reading text…";
+      },"image/jpeg",0.92);
+    }
+
+    async function runOCR(file) {
+      const panel = document.getElementById("ocr-panel");
+      const status = document.getElementById("ocr-status");
+      const output = document.getElementById("ocr-text");
+      const fields = document.getElementById("ocr-fields");
+      if (!panel || !output) return;
+
+      panel.style.display = "block";
+      output.value = "";
+      if (fields) fields.innerHTML = "";
+      if (!window.Tesseract) {
+        if (status) status.textContent = "OCR engine unavailable. Check internet and reload.";
+        return;
+      }
+
+      if (status) status.textContent = "Reading image… 0%";
+      try {
+        const result = await Tesseract.recognize(file,"eng",{
+          logger:function(m){
+            if (status && typeof m.progress === "number")
+              status.textContent = "Reading image… " + Math.round(m.progress*100) + "%";
+          }
+        });
+
+        const raw = ((result.data && result.data.text) || "").trim();
+        output.value = raw || "No readable text found. Try a closer, brighter photo.";
+
+        if (raw) {
+          renderOcrFields(extractInstrumentFields(raw));
+          if (status) status.textContent = "Text extracted successfully.";
+        } else if (status) status.textContent = "No readable text found.";
+      } catch(err) {
+        console.error("OCR error:",err);
+        if (status) status.textContent = "OCR failed. Try a clearer image.";
+      }
+    }
+
+    function extractInstrumentFields(value) {
+      const joined = value.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean).join(" ");
+      function pick(re){const m=joined.match(re);return m?m[1].trim():"";}
+      return {
+        manufacturer:pick(/(?:manufacturer|mfr|make)\s*[:\-]?\s*([A-Za-z0-9 .&'_-]{2,50})/i),
+        model:pick(/(?:model|model no\.?)\s*[:\-]?\s*([A-Za-z0-9._\/-]{2,40})/i),
+        serial:pick(/(?:serial(?: no\.?| number)?|s\/n|sr\.?\s*no\.?)\s*[:#\-]?\s*([A-Za-z0-9._\/-]{4,50})/i),
+        capacity:pick(/(?:capacity|max(?:imum)?|max)\s*[:\-]?\s*([0-9.]+\s*(?:kg|g|t|ton|l|ml)?)/i),
+        accuracy:pick(/(?:accuracy class|class)\s*[:\-]?\s*([A-Za-z0-9 ._-]{1,20})/i),
+        approval:pick(/(?:approval(?: no\.?| number)?|type approval)\s*[:#\-]?\s*([A-Za-z0-9._\/-]{4,60})/i)
+      };
+    }
+
+    function renderOcrFields(data) {
+      const fields = document.getElementById("ocr-fields");
+      if (!fields) return;
+      const items = [
+        ["Manufacturer",data.manufacturer],["Model",data.model],["Serial Number",data.serial],
+        ["Capacity",data.capacity],["Accuracy Class",data.accuracy],["Approval Number",data.approval]
+      ].filter(function(x){return x[1];});
+      fields.innerHTML = items.length ? items.map(function(x){
+        return '<div class="ocr-field"><small>'+x[0]+'</small><b>'+x[1]+'</b></div>';
+      }).join("") : "";
+    }
+
+    function stopCameraStream() {
+      stopQrDetection();
+      if (CAMERA_STREAM) {
+        CAMERA_STREAM.getTracks().forEach(function(t){t.stop();});
+        CAMERA_STREAM = null;
+      }
+      const video = document.getElementById("camera-video");
+      if (video) video.srcObject = null;
+    }
+
+    function closeCamera() {
+      stopCameraStream();
+      const modal = document.getElementById("camera-modal");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden","true");
+      }
+    }
+
+    document.addEventListener("keydown",function(e){
+      if (e.key === "Escape") closeCamera();
+    });
+
+</script>
+</body>
+</html>

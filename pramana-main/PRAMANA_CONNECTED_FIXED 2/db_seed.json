@@ -1,0 +1,282 @@
+{
+  "instruments": [
+    {
+      "id": 1,
+      "serial": "LM-UP-000127",
+      "name": "Sharma Kirana Platform Scale",
+      "type": "platform_scale",
+      "accuracy_class": "III",
+      "max_kg": 300,
+      "e_value": 0.1,
+      "manufacturer": "Essae",
+      "model": "DS-852",
+      "model_approval": "IND/09/2019/214",
+      "premises": "Sharma Stores, Hazratganj",
+      "district": "Lucknow",
+      "state": "Uttar Pradesh",
+      "status": "verified",
+      "oem_status": "genuine",
+      "stamp_lmo": "LMO-LKO-01",
+      "stamp_year": "2026",
+      "stamp_quarter": "A",
+      "last_verified": "2026-01-12",
+      "next_due": "2027-01-12",
+      "lat": 26.8467,
+      "lng": 80.9462,
+      "compliance": {
+        "verdict": "COMPLIANT",
+        "score": 95,
+        "passed": [
+          "Model approval valid",
+          "Seals intact",
+          "Within MPE tolerance",
+          "Genuine OEM parts"
+        ],
+        "issues": [],
+        "rules_applied": [
+          "Legal Metrology Act s.24",
+          "OIML R 76"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "serial": "LM-UP-000431",
+      "name": "Bharat Fuels Dispenser #3",
+      "type": "fuel_dispenser",
+      "accuracy_class": "0.5",
+      "max_kg": 50,
+      "e_value": 0.01,
+      "manufacturer": "Gilbarco",
+      "model": "Prime-S",
+      "model_approval": "IND/12/2021/88",
+      "premises": "Bharat Petroleum, Aliganj",
+      "district": "Lucknow",
+      "state": "Uttar Pradesh",
+      "status": "expired",
+      "oem_status": "third_party",
+      "stamp_lmo": "LMO-LKO-02",
+      "stamp_year": "2024",
+      "stamp_quarter": "C",
+      "last_verified": "2024-06-15",
+      "next_due": "2025-06-15",
+      "lat": 26.8917,
+      "lng": 80.9502,
+      "compliance": {
+        "verdict": "NON_COMPLIANT",
+        "score": 42,
+        "passed": [
+          "Model approval active"
+        ],
+        "issues": [
+          "Certificate expired",
+          "Third-party flow meter detected",
+          "Error exceeds MPE (+1.4e)"
+        ],
+        "rules_applied": [
+          "OIML R 117",
+          "Rule 27"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "serial": "LM-UP-000821",
+      "name": "Kanpur Central Weighbridge",
+      "type": "weighbridge",
+      "accuracy_class": "III",
+      "max_kg": 50000,
+      "e_value": 10,
+      "manufacturer": "TCS Scales",
+      "model": "WB-50T",
+      "model_approval": "IND/05/2020/11",
+      "premises": "New Bharat Freight Carrier, Transport Nagar",
+      "district": "Kanpur Nagar",
+      "state": "Uttar Pradesh",
+      "status": "verified",
+      "oem_status": "genuine",
+      "stamp_lmo": "LMO-KNP-04",
+      "stamp_year": "2026",
+      "stamp_quarter": "B",
+      "last_verified": "2026-03-10",
+      "next_due": "2028-03-10",
+      "lat": 26.4499,
+      "lng": 80.3319,
+      "compliance": {
+        "verdict": "COMPLIANT",
+        "score": 92,
+        "passed": [
+          "Load cell genuine C3 class",
+          "Weighbridge zero-tracking verified"
+        ],
+        "issues": [],
+        "rules_applied": [
+          "Legal Metrology Act s.24",
+          "OIML R 60"
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "serial": "LM-VBN-99102",
+      "name": "Kashi Wholesale Counter Scale",
+      "type": "counter_machine",
+      "accuracy_class": "II",
+      "max_kg": 15,
+      "e_value": 0.002,
+      "manufacturer": "Phoenix",
+      "model": "Avery-15",
+      "model_approval": "IND/09/2022/45",
+      "premises": "Varanasi Mandi Traders",
+      "district": "Varanasi",
+      "state": "Uttar Pradesh",
+      "status": "verified",
+      "oem_status": "genuine",
+      "stamp_lmo": "LMO-VBN-01",
+      "stamp_year": "2026",
+      "stamp_quarter": "A",
+      "last_verified": "2026-02-01",
+      "next_due": "2027-02-01",
+      "lat": 25.3176,
+      "lng": 82.9739,
+      "compliance": {
+        "verdict": "COMPLIANT",
+        "score": 98,
+        "passed": [
+          "All checks passed"
+        ],
+        "issues": [],
+        "rules_applied": [
+          "OIML R 76"
+        ]
+      }
+    }
+  ],
+  "applications": [
+    {
+      "id": 101,
+      "public_id": "APP-2026-881",
+      "instrument_id": 1,
+      "kind": "reverification",
+      "status": "verified",
+      "applicant_name": "Rajesh Sharma",
+      "org": "Sharma Stores",
+      "serial": "LM-UP-000127",
+      "instrument_name": "Sharma Kirana Platform Scale",
+      "district": "Lucknow",
+      "submitted_date": "2026-08-10",
+      "assigned_officer": "Rahul Sharma (LMO-01)"
+    },
+    {
+      "id": 102,
+      "public_id": "APP-2026-904",
+      "instrument_id": 2,
+      "kind": "repair",
+      "status": "inspected",
+      "applicant_name": "Anil Gupta",
+      "org": "Bharat Petroleum",
+      "serial": "LM-UP-000431",
+      "instrument_name": "Bharat Fuels Dispenser #3",
+      "district": "Lucknow",
+      "submitted_date": "2026-08-18",
+      "assigned_officer": "Priya Verma (LMO-02)"
+    },
+    {
+      "id": 103,
+      "public_id": "APP-2026-920",
+      "instrument_id": 3,
+      "kind": "first_verification",
+      "status": "submitted",
+      "applicant_name": "Manoj Singh",
+      "org": "New Bharat Freight Carrier",
+      "serial": "LM-UP-000821",
+      "instrument_name": "Kanpur Central Weighbridge",
+      "district": "Kanpur Nagar",
+      "submitted_date": "2026-08-25",
+      "assigned_officer": "Unassigned"
+    }
+  ],
+  "complaints": [
+    {
+      "id": "CMP-1024",
+      "instrument_id": 2,
+      "serial": "LM-UP-000431",
+      "type": "Incorrect/Short measurement",
+      "description": "Dispenser showing 950ml for 1L delivery test.",
+      "district": "Lucknow",
+      "date": "2026-08-14",
+      "priority": "High",
+      "status": "Investigating",
+      "assigned_officer": "Priya Verma"
+    },
+    {
+      "id": "CMP-1025",
+      "instrument_id": 1,
+      "serial": "LM-UP-000127",
+      "type": "Suspected tampering",
+      "description": "Lead seal wire was found loose during morning unloading.",
+      "district": "Lucknow",
+      "date": "2026-08-22",
+      "priority": "Medium",
+      "status": "New",
+      "assigned_officer": "Unassigned"
+    }
+  ],
+  "certificates": [
+    {
+      "cert_no": "CERT-UP-2026-4412",
+      "instrument_id": 1,
+      "serial": "LM-UP-000127",
+      "owner": "Sharma Stores",
+      "issue_date": "2026-01-12",
+      "expiry_date": "2027-01-12",
+      "status": "Valid"
+    },
+    {
+      "cert_no": "CERT-UP-2024-1180",
+      "instrument_id": 2,
+      "serial": "LM-UP-000431",
+      "owner": "Bharat Petroleum",
+      "issue_date": "2024-06-15",
+      "expiry_date": "2025-06-15",
+      "status": "Expired"
+    }
+  ],
+  "audit": [
+    {
+      "ts": "2026-08-26 10:14:22",
+      "actor_name": "Rahul Sharma",
+      "actor_role": "Officer",
+      "action": "VERIFY_PASS",
+      "entity": "Instrument #1",
+      "entity_id": "LM-UP-000127",
+      "chain_hash": "a89f81bc74e90123efab"
+    },
+    {
+      "ts": "2026-08-25 14:30:10",
+      "actor_name": "Admin Officer",
+      "actor_role": "Admin",
+      "action": "ASSIGN_INSPECTION",
+      "entity": "Application #103",
+      "entity_id": "APP-2026-920",
+      "chain_hash": "3f9011ab827e4910bcde"
+    }
+  ],
+  "notifications": [
+    {
+      "id": 1,
+      "title": "New Inspection Scheduled",
+      "time": "10 mins ago"
+    },
+    {
+      "id": 2,
+      "title": "Grievance CMP-1024 Assigned",
+      "time": "1 hour ago"
+    },
+    {
+      "id": 3,
+      "title": "System Database Backup Completed",
+      "time": "Yesterday"
+    }
+  ]
+}
