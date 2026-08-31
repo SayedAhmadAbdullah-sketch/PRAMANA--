@@ -1,0 +1,6 @@
+# Python runtime artifacts
+__pycache__/
+*.pyc
+
+# User-uploaded inspection photos (runtime data)
+**/backend/uploads/

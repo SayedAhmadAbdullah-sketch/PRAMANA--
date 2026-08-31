@@ -394,6 +394,24 @@
     .warn-text { color: var(--warn); }
     .progress { height: 8px; background: #e8e0d4; border-radius: 99px; overflow: hidden; margin-top: 6px; }
     .progress > span { display: block; height: 100%; background: var(--green); }
+
+    /* toast + shared workflow bits */
+    .pramana-toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 80px); z-index: 10005;
+      background: var(--navy); color: #fff; padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 14px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.25); opacity: 0; transition: all .3s ease; max-width: 90vw; }
+    .pramana-toast.show { transform: translate(-50%, 0); opacity: 1; }
+    .pramana-toast.ok { background: var(--green); }
+    .pramana-toast.bad { background: var(--danger); }
+    .pramana-toast.warn { background: var(--warn); }
+    .nav-group-label { font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: #8fa0b8; padding: 14px 12px 4px; font-weight: 700; }
+    .reason-box { background: #f8e4df; color: var(--danger); border-left: 4px solid var(--danger); padding: 12px 14px; border-radius: 6px; margin-top: 10px; font-size: 13px; line-height: 1.45; }
+    .reason-box b { display:block; margin-bottom: 3px; }
+    .gps-chip { display:inline-flex; align-items:center; gap:5px; background:#e4ebf5; color:var(--navy-2); border-radius:999px; padding:4px 10px; font:600 11px var(--mono); }
+    .insp-photo { width:86px; height:64px; object-fit:cover; border-radius:6px; border:1px solid var(--rule); }
+    .chart-card svg { width:100%; height:auto; display:block; }
+    .range-tabs { display:inline-flex; background:#eee5d8; border-radius:999px; padding:3px; gap:2px; }
+    .range-tabs button { border:0; background:transparent; padding:6px 13px; border-radius:999px; font-size:12px; font-weight:700; color:var(--muted); }
+    .range-tabs button.active { background:var(--navy); color:#fff; }
   
     /* Refined Scan & Verify page */
     .scan-page{position:relative}
@@ -667,6 +685,11 @@
       ]
     };
 
+    // Server-backed workflow records (hydrated from /api/bootstrap)
+    DB.gatc_requests = DB.gatc_requests || [];
+    DB.inspections = DB.inspections || [];
+    DB.authorizations = DB.authorizations || [];
+
     // Backend-backed notification + verification workflow persistence.
     function saveNotifications() {
       try {
@@ -744,7 +767,23 @@
         third_party: ["bad", "Third-party"],
         unknown: ["muted", "Unknown"],
         submitted: ["info", "Submitted"],
+        under_review: ["warn", "Under Review"],
         inspection_scheduled: ["warn", "Inspection scheduled"],
+        gatc_assigned: ["info", "Assigned to GATC"],
+        in_progress: ["info", "In Progress"],
+        inspection_pending: ["warn", "Inspection Pending"],
+        inspection_completed: ["ok", "Inspection Completed"],
+        failed: ["bad", "Failed"],
+        high_risk: ["bad", "High Risk"],
+        outside_jurisdiction: ["warn", "Outside Jurisdiction"],
+        authorization_requested: ["warn", "Authorization Requested"],
+        authorized: ["ok", "Authorized"],
+        authorization_denied: ["bad", "Authorization Denied"],
+        assigned: ["info", "Assigned"],
+        unassigned: ["muted", "Unassigned"],
+        revoked: ["bad", "Revoked"],
+        Revoked: ["bad", "Revoked"],
+        certificate_revoked: ["bad", "Certificate Revoked"],
         pass: ["ok", "Pass"],
         fail: ["bad", "Fail"],
         valid: ["ok", "Valid"],
@@ -759,10 +798,93 @@
         Expired: ["warn", "Expired"],
         Investigating: ["warn", "Investigating"],
         New: ["info", "New"],
-        Resolved: ["ok", "Resolved"]
+        Resolved: ["ok", "Resolved"],
+        test_failed: ["bad", "Test Failed"]
       };
-      const pair = map[status] || ["muted", status || "—"];
+      const pair = map[status] || ["muted", String(status || "—").replace(/_/g, " ")];
       return '<span class="chip ' + pair[0] + '">' + pair[1] + '</span>';
+    }
+
+    // ---------- structured reason catalogs (kept in sync with backend /api/meta) ----------
+    const REASONS = {
+      failure: { third_party_issue: "Third-party / unapproved component detected", tampered_seal: "Tampered or broken lead seal", mpe_exceeded: "Measurement error exceeds MPE tolerance", overdue_verification: "Verification overdue", model_approval_invalid: "Model approval invalid / missing", documentation_invalid: "Invalid or incomplete documentation", other: "Other verification failure" },
+      application_rejection: { details_incorrect: "Instrument or applicant details require correction", not_eligible: "Instrument category not eligible for verification", duplicate: "Duplicate application already exists", documents_invalid: "Supporting documents invalid or missing", out_of_district: "Instrument located outside the officer jurisdiction", other: "Other reason" },
+      gatc_rejection: { not_authorized: "Instrument category not authorized for this GATC", capacity_full: "Testing capacity currently full", invalid_details: "Application or instrument details invalid / incomplete", out_of_service_area: "Instrument out of the GATC service area", duplicate_request: "Duplicate request already exists", other: "Other reason" },
+      authorization: { outside_district: "Case is located outside my jurisdiction / district", equipment_unavailable: "Required test equipment not available in my district", workload_escalation: "Escalation requested due to workload", other: "Other reason" },
+      revoke: { surrendered: "Certificate surrendered by owner / trader", instrument_retired: "Instrument retired from trade", incorrect_issuance: "Certificate issued in error", tampering_found: "Tampering detected after issuance", other: "Other reason" }
+    };
+    function reasonLabel(family, code, fallback) {
+      if (!code) return fallback || "";
+      return (REASONS[family] || {})[code] || String(fallback || code).replace(/_/g, " ");
+    }
+
+    // ---------- toast + confirm dialog (replaces alert/prompt for destructive actions) ----------
+    function toast(msg, type) {
+      const t = document.createElement("div");
+      t.className = "pramana-toast " + (type === "error" ? "bad" : type === "warn" ? "warn" : "ok");
+      t.innerHTML = (type === "error" ? "✕ " : type === "warn" ? "⚠ " : "✓ ") + msg;
+      document.body.appendChild(t);
+      setTimeout(function(){ t.classList.add("show"); }, 20);
+      setTimeout(function(){ t.classList.remove("show"); setTimeout(function(){ t.remove(); }, 350); }, 3600);
+    }
+
+    function confirmDialog(opts) {
+      // opts: {title, message, confirmText, cancelText, danger, requireReason: {family, label, required}}
+      return new Promise(function(resolve) {
+        const existing = document.getElementById("pramana-confirm"); if (existing) existing.remove();
+        let reasonBlock = "";
+        if (opts.requireReason) {
+          const fam = REASONS[opts.requireReason.family] || {};
+          let opts2 = '<option value="">— Select a reason —</option>';
+          Object.keys(fam).forEach(function(k){ opts2 += '<option value="' + k + '">' + fam[k] + '</option>'; });
+          reasonBlock = '<div class="field mt"><label>' + (opts.requireReason.label || "Reason") + ' *</label><select id="confirm-reason-code">' + opts2 + '</select></div>' +
+            '<div class="field"><label>Additional note (optional)</label><textarea id="confirm-reason-note" rows="2" placeholder="Add details..."></textarea></div>';
+        }
+        const wrap = document.createElement("div");
+        wrap.id = "pramana-confirm";
+        wrap.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:10002;padding:18px;";
+        wrap.innerHTML = '<div class="card" style="width:100%;max-width:480px;background:#fff;margin:0;">' +
+          '<h3>' + (opts.title || "Are you sure?") + '</h3>' +
+          '<p style="font-size:14px;color:#4a3f35;margin:0 0 6px;">' + (opts.message || "") + '</p>' + reasonBlock +
+          '<div class="row mt" style="justify-content:flex-end;"><button class="btn btn-ghost" id="confirm-cancel">' + (opts.cancelText || "Cancel") + '</button>' +
+          '<button class="btn ' + (opts.danger ? "btn-danger" : "btn-saffron") + '" id="confirm-ok">' + (opts.confirmText || "Confirm") + '</button></div></div>';
+        document.body.appendChild(wrap);
+        function close(res) { wrap.remove(); resolve(res); }
+        wrap.querySelector("#confirm-cancel").onclick = function(){ close({ ok:false, reasonCode:null, reasonNote:"" }); };
+        wrap.addEventListener("click", function(e){ if (e.target === wrap) close({ ok:false, reasonCode:null, reasonNote:"" }); });
+        wrap.querySelector("#confirm-ok").onclick = function(){
+          let code = null, note = "";
+          if (opts.requireReason) {
+            const sel = wrap.querySelector("#confirm-reason-code");
+            code = sel ? sel.value : null;
+            if (!code && opts.requireReason.required !== false) {
+              sel.style.borderColor = "var(--danger)";
+              const warn = wrap.querySelector("#confirm-reason-warn") || function(){ const w=document.createElement("div"); w.id="confirm-reason-warn"; w.className="tiny bad-text"; w.style.marginTop="6px"; sel.parentElement.appendChild(w); return w; }();
+              warn.textContent = "Please select a reason — it is required.";
+              return;
+            }
+            const ta = wrap.querySelector("#confirm-reason-note");
+            note = ta ? ta.value.trim() : "";
+          }
+          close({ ok:true, reasonCode:code, reasonNote:note });
+        };
+      });
+    }
+
+    async function refreshBootstrap() {
+      try {
+        const b = await api("/api/bootstrap");
+        if (Array.isArray(b.instruments)) DB.instruments = b.instruments;
+        if (Array.isArray(b.applications)) DB.applications = b.applications;
+        if (Array.isArray(b.complaints)) DB.complaints = b.complaints;
+        if (Array.isArray(b.certificates)) DB.certificates = b.certificates;
+        if (Array.isArray(b.audit)) DB.audit = b.audit;
+        if (Array.isArray(b.notifications)) DB.notifications = b.notifications;
+        if (Array.isArray(b.gatcs) && b.gatcs.length) DB.gatcs = b.gatcs;
+        if (Array.isArray(b.gatc_requests)) DB.gatc_requests = b.gatc_requests;
+        if (Array.isArray(b.inspections)) DB.inspections = b.inspections;
+        if (Array.isArray(b.authorizations)) DB.authorizations = b.authorizations;
+      } catch (e) {}
     }
 
     async function api(path, opts = {}) {
@@ -842,47 +964,87 @@
     function landing() {
       return `<div class="hero">
         ${topPublic()}
-        <div class="home-hero-grid">
-          <div class="home-copy">
-            <p class="kicker">Department of Consumer Affairs · Legal Metrology</p>
-            <h1 class="display">Is this scale legal for trade — or a third-party clone?</h1>
-            <p class="lede">PRAMĀṆA is the digital verification lifecycle for weighing and measuring instruments — from application and officer review to field inspection, scheduling, QR verification and authenticity checks.</p>
-            <div class="pschip">SIH26036 · Software · Transportation &amp; Logistics</div>
-            <div class="home-actions">
-              <button class="linkish home-primary" onclick="openScanner()">⌕&nbsp; Scan / Verify</button>
-              <button class="linkish" onclick="go('login-unified')">Apply for Verification →</button>
-            </div>
+        <div style="text-align:center;max-width:760px;margin:8px auto 0;">
+          <p class="kicker">प्रमाण · Department of Consumer Affairs · Legal Metrology</p>
+          <h1 class="display" style="max-width:none;margin-left:auto;margin-right:auto;">Is this scale legal for trade — or a third-party clone?</h1>
+          <p class="lede" style="margin-left:auto;margin-right:auto;">PRAMĀṆA is the digital verification lifecycle for weighing and measuring instruments — from application and officer review to GATC testing, field inspection, QR verification and authenticity checks.</p>
+          <div class="pschip" style="justify-content:center;">SIH26036 · Software · Transportation &amp; Logistics</div>
+        </div>
+
+        <!-- ============ SCAN / VERIFY — prominently in the middle ============ -->
+        <div class="home-verify-card" style="max-width:640px;margin:30px auto 0;padding:28px 30px;text-align:center;">
+          <div class="home-action-icon" style="margin:0 auto 12px;width:52px;height:52px;font-size:26px;">⌕</div>
+          <h2 style="font-size:27px;">Scan / Verify an Instrument</h2>
+          <p style="max-width:44ch;margin-left:auto;margin-right:auto;">Check any instrument's registry status, certificate validity and authenticity — scan its QR code, or enter the serial number below.</p>
+          <div class="home-verify-input" style="max-width:460px;margin:0 auto;">
+            <input id="home-verify-id" value="LM-UP-000127" placeholder="Instrument ID / Serial No." onkeydown="if(event.key==='Enter')go('public-result',{q:document.getElementById('home-verify-id').value.trim()||'LM-UP-000127'})" />
+            <button onclick="go('public-result',{q:document.getElementById('home-verify-id').value.trim()||'LM-UP-000127'})">Verify</button>
           </div>
-          <div class="home-verify-card">
-            <div class="kicker" style="margin-bottom:6px;">Public Registry</div>
-            <h2>Verify an Instrument</h2>
-            <p>Enter an instrument serial number to check its current registry and verification status.</p>
-            <div class="home-verify-input">
-              <input id="home-verify-id" value="LM-UP-000127" placeholder="Instrument ID / Serial No." />
-              <button onclick="go('public-result',{q:document.getElementById('home-verify-id').value.trim()||'LM-UP-000127'})">Verify</button>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
-              <span class="chip ok">✓ Registry Check</span><span class="chip info">QR Ready</span><span class="chip muted">Status Lookup</span>
-            </div>
+          <div class="row" style="justify-content:center;margin-top:14px;">
+            <button class="btn btn-navy" onclick="openScanner()">▣ &nbsp;Scan QR Code</button>
+            <button class="btn btn-gold" onclick="go('scan-lab')">🛡 &nbsp;Photo Authenticity Check</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:14px;">
+            <span class="chip ok">✓ Registry Check</span><span class="chip info">QR Ready</span><span class="chip warn">Seal &amp; OEM Check</span>
           </div>
         </div>
+
         <div class="home-trust">
-          <div class="home-trust-item"><b>12,480+</b><span>Registered Instruments</span></div>
-          <div class="home-trust-item"><b>8,920+</b><span>Verified Records</span></div>
-          <div class="home-trust-item"><b>124</b><span>Inspections Today</span></div>
+          <div class="home-trust-item"><b id="trust-instruments">—</b><span>Registered Instruments</span></div>
+          <div class="home-trust-item"><b id="trust-verified">—</b><span>Verified / Certified</span></div>
+          <div class="home-trust-item"><b id="trust-gatc">—</b><span>GATC Test Centres</span></div>
           <div class="home-trust-item"><b>24×7</b><span>Public Status Access</span></div>
         </div>
         <div class="home-notice"><b>Important Notice</b><span>Owners and traders must submit a verification application before field verification. An appointment is shown only after a Metrology Officer approves the request.</span></div>
       </div>
 
+      <!-- ============ SCAN SECTION (card + add action) ============ -->
       <section class="home-section">
-        <div class="home-section-head"><div><p class="kicker">Verification Lifecycle</p><h2>How PRAMĀṆA Works</h2></div><p>A simple, traceable workflow connecting the owner/trader with the Metrology Officer.</p></div>
+        <div class="home-section-head"><div><p class="kicker">Scan &amp; Register</p><h2>Scan</h2></div><p>Scan a QR code or nameplate to verify an instrument instantly — or add a new instrument to the registry to start its verification.</p></div>
+        <div class="home-actions-grid">
+          <div class="home-action-card" style="border-color:var(--gold);background:linear-gradient(150deg,#fff,#fdf6ea);"><div class="home-action-icon" style="background:#fff0e3;color:var(--saffron);">▣</div><h3>Scan QR / Nameplate</h3><p>Point your camera at the instrument QR code or capture the nameplate — PRAMĀṆA reads it and shows the live registry result.</p><button onclick="openScanner()">Scan Now →</button></div>
+          <div class="home-action-card"><div class="home-action-icon" style="background:#e7f3ee;color:var(--green);">＋</div><h3>Add Instrument</h3><p>Traders and owners can add a new instrument and submit it for Legal Metrology verification.</p><button onclick="addInstrumentAction()">＋ Add / Register →</button></div>
+          <div class="home-action-card"><div class="home-action-icon">⌕</div><h3>Verify Result</h3><p>Look up any serial to see its verification status, certificate and compliance audit.</p><button onclick="document.getElementById('home-verify-id') ? (document.getElementById('home-verify-id').scrollIntoView({behavior:'smooth'}), document.getElementById('home-verify-id').focus()) : go('public-result',{q:'LM-UP-000127'})">Verify Serial →</button></div>
+          <div class="home-action-card"><div class="home-action-icon">▲</div><h3>Report an Issue</h3><p>Found a short-measuring meter or a broken seal? Report it for officer investigation.</p><button onclick="openComplaintModal()">Report Issue →</button></div>
+        </div>
+      </section>
+
+      <!-- ============ PRAMANA / VERIFICATION EXPLANATION ============ -->
+      <section class="home-section">
+        <div class="home-section-head"><div><p class="kicker">What is प्रमाण (Pramāṇa)?</p><h2>How the PRAMĀṆA Verification Works</h2></div><p>प्रमाण means “proof”. Every verified instrument carries a proof trail: who verified it, when, against which rules, and with what result.</p></div>
+        <div class="grid-2" style="align-items:start;">
+          <div class="card" style="margin-bottom:0;">
+            <h3>What we verify</h3>
+            <table class="table">
+              <tr><td><b>Nameplate &amp; OEM identity</b></td><td>Manufacturer, model and model-approval number match the registered records.</td></tr>
+              <tr><td><b>Measurements vs MPE</b></td><td>Indicated weight/volume stays within the Maximum Permissible Error at test loads.</td></tr>
+              <tr><td><b>Seals &amp; stamps</b></td><td>Lead wire seal and LMO security stamp are intact and untampered.</td></tr>
+              <tr><td><b>Registry status</b></td><td>The serial exists on the state registry and its certificate is valid / not revoked.</td></tr>
+            </table>
+            <p class="tiny" style="margin-top:10px;">Results are recorded against the Legal Metrology Act 2009 (s.24) and OIML R 76 / R 117 tolerances.</p>
+          </div>
+          <div class="card" style="margin-bottom:0;">
+            <h3>How the process runs</h3>
+            <div class="steps" style="margin-top:6px;">
+              <li><span class="dot ok"></span><span><b>1 · Apply</b> — the trader submits the instrument for verification.</span></li>
+              <li><span class="dot ok"></span><span><b>2 · Officer review</b> — a Metrology Officer approves or rejects (with a stated reason).</span></li>
+              <li><span class="dot ok"></span><span><b>3 · GATC testing</b> — the request goes to a Government Approved Test Centre; it passes or fails the instrument.</span></li>
+              <li><span class="dot ok"></span><span><b>4 · Field inspection</b> — measurements, photos and GPS are captured on site.</span></li>
+              <li><span class="dot ok"></span><span><b>5 · Fee &amp; certificate</b> — after the fee is paid, the digital certificate is issued and verifiable by QR.</span></li>
+            </div>
+            <button class="btn btn-navy mt" onclick="go('guidelines')">Read the Rule Library</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="home-section">
+        <div class="home-section-head"><div><p class="kicker">Verification Lifecycle</p><h2>From Application to Verified</h2></div><p>A simple, traceable workflow connecting the owner/trader, Metrology Officer, GATC and field inspection.</p></div>
         <div class="workflow-line">
           <div class="workflow-step"><span class="workflow-num">01 · OWNER</span><h3>Apply</h3><p>Submit instrument and establishment details for verification.</p></div>
-          <div class="workflow-step"><span class="workflow-num">02 · SYSTEM</span><h3>Pending</h3><p>The request enters the officer review queue with a clear status.</p></div>
-          <div class="workflow-step"><span class="workflow-num">03 · OFFICER</span><h3>Approve</h3><p>Officer checks the application and approves or rejects it.</p></div>
-          <div class="workflow-step"><span class="workflow-num">04 · OFFICER</span><h3>Schedule</h3><p>After approval, the officer assigns the verification date and time.</p></div>
-          <div class="workflow-step"><span class="workflow-num">05 · FIELD</span><h3>Verify</h3><p>The instrument is presented for physical inspection and verification.</p></div>
+          <div class="workflow-step"><span class="workflow-num">02 · OFFICER</span><h3>Approve</h3><p>Officer checks the application and approves or rejects it with a reason.</p></div>
+          <div class="workflow-step"><span class="workflow-num">03 · GATC</span><h3>Test</h3><p>An approved test centre tests the instrument and records PASS/FAIL.</p></div>
+          <div class="workflow-step"><span class="workflow-num">04 · OFFICER</span><h3>Inspect</h3><p>Field inspection with measurements, photos and GPS location.</p></div>
+          <div class="workflow-step"><span class="workflow-num">05 · SYSTEM</span><h3>Certify</h3><p>Fee payment issues the digital certificate — verifiable by anyone via QR.</p></div>
         </div>
       </section>
 
@@ -897,18 +1059,33 @@
       </section>
 
       <section class="home-section">
-        <div class="owner-strip"><div><p class="kicker" style="color:#e8d3a4;margin-bottom:5px;">For Owners &amp; Traders</p><h2>Need your instrument verified?</h2><p>Sign in, submit the application, wait for officer approval, then receive your verification date and time inside your dashboard.</p><div class="owner-steps"><span class="owner-step-pill">1 SIGN IN</span><span class="owner-step-pill">2 APPLY</span><span class="owner-step-pill">3 APPROVAL</span><span class="owner-step-pill">4 SCHEDULE</span><span class="owner-step-pill">5 FIELD VERIFY</span></div></div><button onclick="go('login-unified')">Start Application →</button></div>
+        <div class="owner-strip"><div><p class="kicker" style="color:#e8d3a4;margin-bottom:5px;">For Owners &amp; Traders</p><h2>Need your instrument verified?</h2><p>Sign in, submit the application, wait for officer approval, then receive your verification date and time inside your dashboard.</p><div class="owner-steps"><span class="owner-step-pill">1 SIGN IN</span><span class="owner-step-pill">2 APPLY</span><span class="owner-step-pill">3 APPROVAL</span><span class="owner-step-pill">4 GATC TEST</span><span class="owner-step-pill">5 FIELD VERIFY</span></div></div><button onclick="go('login-unified')">Start Application →</button></div>
       </section>
 
       <section class="home-section">
         <div class="home-section-head"><div><p class="kicker">Built for Trust</p><h2>Why PRAMĀṆA?</h2></div><p>Designed to make instrument verification easier to apply for, review and track.</p></div>
         <div class="why-grid">
-          <div class="why-item"><h3>Government Workflow</h3><p>Maps the application, officer review, scheduling and field verification lifecycle.</p></div>
-          <div class="why-item"><h3>Transparent Status</h3><p>Owners can see exactly whether their request is Pending, Approved, Scheduled or Completed.</p></div>
+          <div class="why-item"><h3>Government Workflow</h3><p>Maps the application, officer review, GATC testing and field verification lifecycle.</p></div>
+          <div class="why-item"><h3>Transparent Status</h3><p>Owners can see exactly whether their request is Pending, Approved, Rejected (with reason) or Completed.</p></div>
           <div class="why-item"><h3>Secure Verification</h3><p>Public registry lookup and QR-oriented verification make instrument identity easier to check.</p></div>
-          <div class="why-item"><h3>Field Ready</h3><p>Officer scheduling connects digital applications with the physical inspection visit.</p></div>
+          <div class="why-item"><h3>Field Ready</h3><p>Officers capture measurements, photos and GPS during every inspection visit.</p></div>
         </div>
       </section>` + officialGovFooter();
+    }
+
+    function addInstrumentAction() {
+      if (S.user && S.user.role === "user") go("verification-apply");
+      else go("login-unified");
+    }
+
+    async function hydrateLandingStats() {
+      try {
+        const st = await api("/api/stats");
+        const el = function(id){ return document.getElementById(id); };
+        if (el("trust-instruments")) el("trust-instruments").textContent = st.instruments.toLocaleString("en-IN");
+        if (el("trust-verified")) el("trust-verified").textContent = (st.certificates_valid || 0).toLocaleString("en-IN") + "+";
+        if (el("trust-gatc")) el("trust-gatc").textContent = st.gatcs_total || 0;
+      } catch (e) {}
     }
 
     let currentLoginRole = "user";
@@ -981,28 +1158,33 @@
       let items = [];
       if (role === "admin") {
         items = [
-          ["admin-home", "Dashboard", "Overview"],
-          ["admin-registry", "Instrument Registry", "Database"],
-          ["admin-applications", "Applications", "Workflows"],
-          ["admin-gatc-network", "GATC Network", "Approved centres"],
-          ["admin-inspections", "Inspections", "Field tests"],
-          ["admin-risk", "Risk & Enforcement", "Priority queue"],
-          ["admin-complaints", "Complaints", "Grievances"],
-          ["admin-officers", "Officers", "Workload"],
-          ["admin-analytics", "Reports & Analytics", "Metrics"],
-          ["admin-map", "Enforcement Map", "GIS View"],
-          ["guidelines", "Rule Library", "India + OIML"]
+          ["admin-home", "Dashboard", "Overview", "Overview"],
+          ["admin-analytics", "Reports & Analytics", "Charts & metrics", "Overview"],
+          ["admin-applications", "Applications", "Assign officers", "Workflow"],
+          ["admin-inspections", "Inspections", "Field tests", "Workflow"],
+          ["admin-gatc-network", "GATC Network", "Approved centres", "Workflow"],
+          ["admin-gatc-requests", "MO ↔ GATC Requests", "Approvals & rejections", "Workflow"],
+          ["admin-risk", "Risk & Failed Cases", "High-risk · jurisdiction", "Enforcement"],
+          ["admin-complaints", "Complaints", "Grievances", "Enforcement"],
+          ["admin-officers", "Officers", "Workload", "Enforcement"],
+          ["admin-map", "Enforcement Map", "GIS View", "Enforcement"],
+          ["admin-registry", "Instrument Registry", "Database", "Registry"],
+          ["guidelines", "Rule Library", "India + OIML", "Registry"]
         ];
       } else if (role === "officer") {
         items = [
           ["officer-home", "Officer Desk", "Overview"],
-          ["officer-queue", "Inspection Queue", "Assigned"],
+          ["officer-queue", "Inspection Queue", "Assigned applications"],
+          ["officer-inspect", "Field Inspection", "Measurements · photo · GPS"],
+          ["officer-gatc", "GATC Requests", "Send / track"],
+          ["officer-highrisk", "High-Risk & Jurisdiction", "Priority cases"],
           ["scan-lab", "Photo Authenticity", "Genuine vs clone"],
           ["guidelines", "Rule Library", "Standards"]
         ];
       } else if (role === "gatc") {
         items = [
           ["gatc-home", "GATC Dashboard", "Centre overview"],
+          ["gatc-inbox", "MO Requests", "Approve / reject"],
           ["gatc-requests", "Assigned Instruments", "Instruments assigned for testing"],
           ["gatc-schedule", "Test Schedule", "Upcoming tests"],
           ["gatc-results", "Test Results", "Submitted test results"],
@@ -1025,7 +1207,7 @@
       if (role === "gatc") {
         const u = S.user || {name:"GATC Operator", role:"GATC Operator", org:"ABC Legal Metrology", gatc_id:21};
         const iconMap = {
-          "gatc-home":"▦","gatc-requests":"▤","gatc-schedule":"▣","gatc-results":"☑",
+          "gatc-home":"▦","gatc-inbox":"📥","gatc-requests":"▤","gatc-schedule":"▣","gatc-results":"☑",
           "gatc-history":"◷","gatc-notifications":"🔔"
         };
         let navBtns = "";
@@ -1039,7 +1221,12 @@
       }
 
       let navBtns = "";
+      let lastGroup = null;
       items.forEach(function(item, index) {
+        if (item[3] && item[3] !== lastGroup) {
+          navBtns += '<div class="nav-group-label">' + item[3] + '</div>';
+          lastGroup = item[3];
+        }
         let activeClass = "";
         if (role === "user") {
           activeClass = S.navActive === index ? "active" : "";
@@ -1103,10 +1290,7 @@
       const paid = apps.find(function(a){ return a.status === "payment_paid" && a.payment; });
       const pending = apps.find(function(a){ return a.status === "payment_pending" || a.status === "completed"; });
       const defaultInst = paid ? paid.serial : (pending ? pending.serial : "LM-UP-000127");
-      const verified = DB.instruments.find(function(i){ return String(i.serial) === "LM-UP-000127"; }) || DB.instruments[0];
-      const certNo = verified ? "CERT-UP-2026-" + String(verified.id).padStart(4,"0") : "—";
-      const issueDate = verified && verified.last_verified ? verified.last_verified : new Date().toISOString().slice(0,10);
-      const expiryDate = verified && verified.next_due ? verified.next_due : "—";
+      const verified = DB.instruments.find(function(i){ return String(i.serial) === String(defaultInst); }) || DB.instruments[0];
       const amount = pending ? verificationFeeForApplication(pending) : (paid ? Number(paid.payment.amount || verificationFeeForApplication(paid)) : 750);
       const paymentCard = paid ?
         '<div class="card" style="background:#e4f2ea;border-color:#b9ddc8;color:var(--green-d);"><div style="font-size:34px;line-height:1;margin-bottom:8px;">✓</div><h3 style="color:var(--green-d);margin-bottom:6px;">Payment Successful</h3><p style="margin:0 0 10px;color:inherit;">Your verification fee has been received.</p><div class="grid-2"><div><span class="tiny">TRANSACTION ID</span><br><b class="mono">' + paid.payment.payment_id + '</b></div><div><span class="tiny">AMOUNT PAID</span><br><b>₹' + Number(paid.payment.amount || 0).toLocaleString("en-IN") + '</b></div></div><div class="tiny" style="margin-top:10px;color:inherit;">Payment Date: ' + new Date(paid.payment.paid_on).toLocaleString("en-IN") + '</div></div>' :
@@ -1125,27 +1309,93 @@
       openVerificationPayment(a.id);
     }
 
+    function findCertificateFor(value) {
+      // value: serial or instrument id — look up the real certificate record from the backend registry
+      const inst = DB.instruments.find(function(i){ return String(i.serial || "").toUpperCase() === String(value).toUpperCase() || String(i.id) === String(value); });
+      if (!inst) return { inst: null, cert: null };
+      const cert = (DB.certificates || []).find(function(c){ return String(c.instrument_id) === String(inst.id); });
+      return { inst: inst, cert: cert || null };
+    }
+
     function viewCertificateFromFeePage() {
       const input = document.getElementById("certificate-instrument-id");
-      const value = input ? input.value.trim().toUpperCase() : "";
-      const paid = getOwnerApplications().find(function(a){ return a.status === "payment_paid" && (String(a.serial || "").toUpperCase() === value || String(a.instrument_id) === value); });
-      const inst = DB.instruments.find(function(i){ return String(i.serial || "").toUpperCase() === value || String(i.id) === value; });
+      const value = input ? input.value.trim() : "";
       const out = document.getElementById("certificate-out");
       if (!out) return;
-      if (!paid && (!inst || inst.status !== "verified")) { out.innerHTML='<div class="card" style="background:#fff7e6;color:var(--warn);">Certificate is not available yet. Complete payment and the verification process first.</div>'; return; }
+      const paid = getOwnerApplications().find(function(a){ return a.status === "payment_paid" && (String(a.serial || "").toUpperCase() === value.toUpperCase() || String(a.instrument_id) === value); });
+      const hit = findCertificateFor(value);
+      const inst = hit.inst;
+      const cert = hit.cert;
       if (!inst) { out.innerHTML='<div class="card" style="background:#f8e4df;color:var(--danger);">Instrument not found in your registry.</div>'; return; }
-      const certNo = "CERT-UP-2026-" + String(inst.id).padStart(4,"0");
-      out.innerHTML='<div class="card" style="background:#fffdf8;border:1px solid #ead9bf;"><div class="row"><h3>Certificate Details</h3>' + chip("valid") + '</div><table class="table" style="margin-top:10px;"><tr><th>Certificate No.</th><td class="mono"><b>' + certNo + '</b></td></tr><tr><th>Instrument ID</th><td class="mono">' + inst.serial + '</td></tr><tr><th>Instrument</th><td>' + inst.name + '</td></tr><tr><th>Issue Date</th><td class="mono">' + (inst.last_verified || "—") + '</td></tr><tr><th>Expiry Date</th><td class="mono">' + (inst.next_due || "—") + '</td></tr><tr><th>Owner / Establishment</th><td>' + inst.premises + '</td></tr><tr><th>Status</th><td>' + chip("valid") + '</td></tr></table><button class="btn btn-navy mt" onclick="go(\'public-result\',{q:\'' + inst.serial + '\'})">View Full Certificate</button></div>';
+      if (!cert && !paid) { out.innerHTML='<div class="card" style="background:#fff7e6;color:var(--warn);">Certificate is not available yet. Complete payment and the verification process first.</div>'; return; }
+      const revoked = cert && (cert.status === "Revoked" || cert.status === "revoked");
+      const expired = cert && cert.status === "Expired";
+      const statusChip = revoked ? chip("Revoked") : expired ? chip("Expired") : chip("Valid");
+      let revokeBtn = "";
+      if (cert && !revoked) {
+        revokeBtn = '<button class="btn btn-danger mt" onclick="revokeCertificateAction(\'' + cert.cert_no + '\',' + inst.id + ')">Remove / Revoke Certificate</button><p class="tiny" style="margin-top:6px;color:var(--muted);">Revoking marks the certificate invalid on the public registry. This cannot be undone from this portal.</p>';
+      } else if (revoked) {
+        revokeBtn = '<div class="reason-box"><b>Certificate revoked on ' + (cert.revoked_at || "—") + '</b>' + (cert.revoke_reason_label || "") + (cert.revoke_note ? '<div class="tiny" style="margin-top:4px;">' + cert.revoke_note + '</div>' : '') + (cert.revoked_by ? '<div class="tiny" style="margin-top:4px;">by ' + cert.revoked_by + '</div>' : '') + '</div>';
+      }
+      out.innerHTML='<div class="card" style="background:#fffdf8;border:1px solid #ead9bf;"><div class="row"><h3>Certificate Details</h3>' + statusChip + '</div><table class="table" style="margin-top:10px;"><tr><th>Certificate No.</th><td class="mono"><b>' + (cert ? cert.cert_no : "PENDING — issued after payment") + '</b></td></tr><tr><th>Instrument ID</th><td class="mono">' + inst.serial + '</td></tr><tr><th>Instrument</th><td>' + inst.name + '</td></tr><tr><th>Issue Date</th><td class="mono">' + (cert ? cert.issue_date : (inst.last_verified || "—")) + '</td></tr><tr><th>Expiry Date</th><td class="mono">' + (cert ? cert.expiry_date : (inst.next_due || "—")) + '</td></tr><tr><th>Owner / Establishment</th><td>' + (cert ? cert.owner : inst.premises) + '</td></tr><tr><th>Status</th><td>' + statusChip + '</td></tr></table>' + (cert ? '<button class="btn btn-navy mt" onclick="go(\'public-result\',{q:\'' + inst.serial + '\'})">View Full Certificate</button>' : '<p class="tiny mt">Complete the verification fee payment to receive the digital certificate.</p>') + revokeBtn + '</div>';
+    }
+
+    async function revokeCertificateAction(certNo, instrumentId) {
+      const res = await confirmDialog({
+        title: "Remove / Revoke Certificate?",
+        message: "Certificate <b class='mono'>" + certNo + "</b> will be marked <b>Revoked</b> on the public registry. Anyone verifying this instrument will see it as revoked.",
+        confirmText: "Revoke Certificate",
+        danger: true,
+        requireReason: { family: "revoke", label: "Reason for revocation", required: true }
+      });
+      if (!res.ok) return;
+      try {
+        await api("/api/certificates/revoke", { method: "POST", body: { cert_no: certNo, instrument_id: instrumentId, reason_code: res.reasonCode, note: res.reasonNote } });
+        toast("Certificate " + certNo + " has been revoked.", "ok");
+        await refreshBootstrap();
+        render();
+      } catch (e) {
+        toast(e.message || "Revocation failed", "error");
+      }
     }
 
     async function consumerHome() {
       const complaints = DB.complaints;
       const apps = getOwnerApplications();
-      const pending = apps.filter(function(a){return a.status === "pending";}).length;
-      const scheduled = apps.filter(function(a){return a.status === "scheduled";}).length;
+      const pending = apps.filter(function(a){return a.status === "pending" || a.status === "submitted";}).length;
+      const scheduled = apps.filter(function(a){return a.status === "scheduled" || a.status === "gatc_assigned";}).length;
+      const approved = apps.filter(function(a){return ["approved","scheduled","gatc_assigned","inspection_completed","payment_pending","payment_paid","verified"].indexOf(a.status) !== -1;}).length;
+      const rejected = apps.filter(function(a){return a.status === "rejected";}).length;
+      const failed = apps.filter(function(a){return a.status === "failed";}).length;
+      const paymentDue = apps.filter(function(a){return a.status === "payment_pending" || a.status === "completed";}).length;
+      const myCerts = DB.certificates.filter(function(c){ return apps.some(function(a){ return String(a.instrument_id) === String(c.instrument_id); }); });
+      const validCert = myCerts.filter(function(c){ return c.status === "Valid"; }).length;
       const latest = apps[0];
-      const workflowCard = latest ? '<div class="card"><div class="row"><h3>Latest Verification Application</h3>' + chip(latest.status) + '</div><p class="tiny mono">' + latest.public_id + ' · ' + latest.serial + '</p>' + verificationTimeline(latest) + (latest.schedule ? '<div class="card" style="background:#e4f2ea;margin-top:12px;"><b style="color:var(--green-d);">Scheduled: ' + latest.schedule.date + ' at ' + latest.schedule.time + '</b><div class="tiny" style="color:var(--green-d);">Officer: ' + latest.schedule.officer + '</div></div>' : '') + '<button class="btn btn-navy mt" onclick="go(\'verification-applications\')">View My Applications</button></div>' : '<div class="card"><h3>Instrument Verification</h3><p class="tiny">Need your weighing or measuring instrument verified? Apply online first. The request goes to Pending, then a Metrology Officer approves it, and only then a date/time is scheduled.</p><button class="btn btn-saffron mt" onclick="go(\'verification-apply\')">Apply for Verification</button></div>';
-      return shell("", '<p class="crumb">Owner / Trader Portal · Instrument Safety</p><h1>Welcome, ' + (S.user?.name || "Citizen") + '.</h1><p class="intro">Manage instrument verification requests, track officer approval, view your verification schedule, scan instruments, and report issues.</p><div class="grid-3 mb"><div class="card" style="background:linear-gradient(135deg,#0e4a2e,#1a6b45);color:#fff;"><h3>Apply for Verification</h3><p style="opacity:0.9;font-size:14px;margin-bottom:14px;">Submit your instrument for Legal Metrology verification. Approval comes before scheduling.</p><button class="btn btn-gold" onclick="go(\'verification-apply\')">Start Application ➔</button></div><div class="card" style="background:var(--navy);color:#fff;"><h3>My Applications</h3><p style="font-family:var(--serif);font-size:32px;margin:6px 0;">' + apps.length + '</p><p style="font-size:13px;opacity:0.8;margin:0;">' + pending + ' pending · ' + scheduled + ' scheduled</p></div><div class="card" style="background:#fff;border-left:4px solid var(--saffron);"><h3>Verification Schedule</h3><p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Your date and time appear only after officer approval.</p><button class="btn btn-navy" onclick="go(\'verification-applications\')">View Schedule</button></div></div><div class="grid-2"><div>' + workflowCard + '</div><div><div class="card"><h3>Scan Instrument</h3><p class="tiny">Upload a nameplate, scale, sensor, or seal image for authenticity and compliance analysis.</p><button class="btn btn-navy mt" onclick="openScanner()">Launch Scanner</button></div><div class="card mt"><h3>Active Complaints</h3><p style="font-family:var(--serif);font-size:32px;margin:6px 0;">' + complaints.length + '</p><button class="btn btn-danger mt" onclick="go(\'consumer-complaints\')">View Complaints</button></div></div></div>', "user");
+      // Top summary card (dashboard "Top Card")
+      const topCard = '<div class="card mb" style="background:linear-gradient(135deg,var(--navy),#2a4d7c);color:#fff;border:0;"><div class="row" style="justify-content:space-between;align-items:flex-start;"><div><p class="kicker" style="color:#e8d3a4;margin-bottom:4px;">Verification Summary · Top Card</p><h3 style="color:#fff;margin:0 0 6px;">Your verification status at a glance</h3><p class="tiny" style="color:rgba(255,255,255,.75);margin:0;">Application lifecycle, GATC testing and certificate health — updated live from the registry.</p></div><div style="text-align:right;"><div style="font-family:var(--serif);font-size:40px;line-height:1;">' + apps.length + '</div><span class="tiny" style="color:rgba(255,255,255,.75);">TOTAL APPLICATIONS</span></div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:16px;">' +
+        '<div style="background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:10px 12px;"><b style="font-family:var(--serif);font-size:22px;">' + pending + '</b><div class="tiny" style="color:rgba(255,255,255,.75);">Pending</div></div>' +
+        '<div style="background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:10px 12px;"><b style="font-family:var(--serif);font-size:22px;">' + approved + '</b><div class="tiny" style="color:rgba(255,255,255,.75);">Approved</div></div>' +
+        '<div style="background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:10px 12px;"><b style="font-family:var(--serif);font-size:22px;color:#ffb3a6;">' + rejected + '</b><div class="tiny" style="color:rgba(255,255,255,.75);">Rejected</div></div>' +
+        '<div style="background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:10px 12px;"><b style="font-family:var(--serif);font-size:22px;color:#ffb3a6;">' + failed + '</b><div class="tiny" style="color:rgba(255,255,255,.75);">Failed</div></div>' +
+        '<div style="background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:10px 12px;"><b style="font-family:var(--serif);font-size:22px;color:#ffe9a8;">' + paymentDue + '</b><div class="tiny" style="color:rgba(255,255,255,.75);">Fee Due</div></div>' +
+        '<div style="background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:10px 12px;"><b style="font-family:var(--serif);font-size:22px;color:#a9e8c4;">' + validCert + '</b><div class="tiny" style="color:rgba(255,255,255,.75);">Valid Certificates</div></div>' +
+        '</div><div class="row mt"><button class="btn btn-gold" onclick="go(\'verification-applications\')">View Applications</button><button class="btn btn-gold" onclick="go(\'fee-payment\')">Fee &amp; Payment</button><button class="btn btn-gold" onclick="go(\'verification-apply\')">New Application</button></div></div>';
+      const workflowCard = latest ? '<div class="card"><div class="row"><h3>Latest Verification Application</h3>' + chip(latest.status) + '</div><p class="tiny mono">' + latest.public_id + ' · ' + latest.serial + '</p>' + verificationTimeline(latest) + (latest.schedule ? '<div class="card" style="background:#e4f2ea;margin-top:12px;"><b style="color:var(--green-d);">Scheduled: ' + latest.schedule.date + ' at ' + latest.schedule.time + '</b><div class="tiny" style="color:var(--green-d);">Officer: ' + latest.schedule.officer + '</div></div>' : '') + (latest.status === "rejected" ? '<div class="reason-box"><b>Rejection reason</b>' + (latest.rejection_reason || "Officer did not approve this application.") + '</div><button class="btn btn-saffron mt" onclick="resubmitApplication(' + latest.id + ')">Update &amp; Resubmit Application</button>' : '') + '<button class="btn btn-navy mt" onclick="go(\'verification-applications\')">View My Applications</button></div>' : '<div class="card"><h3>Instrument Verification</h3><p class="tiny">Need your weighing or measuring instrument verified? Apply online first. The request goes to Pending, then a Metrology Officer approves it, and only then a date/time is scheduled.</p><button class="btn btn-saffron mt" onclick="go(\'verification-apply\')">Apply for Verification</button></div>';
+      return shell("", '<p class="crumb">Owner / Trader Portal · Instrument Safety</p><h1>Welcome, ' + (S.user?.name || "Citizen") + '.</h1><p class="intro">Manage instrument verification requests, track officer approval, view your verification schedule, scan instruments, and report issues.</p>' + topCard + '<div class="grid-3 mb"><div class="card" style="background:linear-gradient(135deg,#0e4a2e,#1a6b45);color:#fff;"><h3>Apply for Verification</h3><p style="opacity:0.9;font-size:14px;margin-bottom:14px;">Submit your instrument for Legal Metrology verification. Approval comes before scheduling.</p><button class="btn btn-gold" onclick="go(\'verification-apply\')">Start Application ➔</button></div><div class="card" style="background:var(--navy);color:#fff;"><h3>My Applications</h3><p style="font-family:var(--serif);font-size:32px;margin:6px 0;">' + apps.length + '</p><p style="font-size:13px;opacity:0.8;margin:0;">' + pending + ' pending · ' + scheduled + ' scheduled</p></div><div class="card" style="background:#fff;border-left:4px solid var(--saffron);"><h3>Verification Schedule</h3><p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Your date and time appear only after officer approval.</p><button class="btn btn-navy" onclick="go(\'verification-applications\')">View Schedule</button></div></div><div class="grid-2"><div>' + workflowCard + '</div><div><div class="card"><h3>Scan Instrument</h3><p class="tiny">Upload a nameplate, scale, sensor, or seal image for authenticity and compliance analysis.</p><button class="btn btn-navy mt" onclick="openScanner()">Launch Scanner</button></div><div class="card mt"><h3>Active Complaints</h3><p style="font-family:var(--serif);font-size:32px;margin:6px 0;">' + complaints.length + '</p><button class="btn btn-danger mt" onclick="go(\'consumer-complaints\')">View Complaints</button></div></div></div>', "user");
+    }
+
+    async function resubmitApplication(aid) {
+      const a = DB.applications.find(function(x){ return x.id === aid; });
+      if (!a) return;
+      const res = await confirmDialog({
+        title: "Resubmit application?",
+        message: "A fresh application will be created for <b class='mono'>" + a.serial + "</b> with the same instrument and owner details. You can review and correct the details before submitting.",
+        confirmText: "Continue to form",
+        danger: false
+      });
+      if (!res.ok) return;
+      S.payload = { resubmit_of: aid };
+      go("verification-apply");
     }
 
     async function consumerNearby() {
@@ -1351,13 +1601,41 @@
 
     async function adminHome() {
       const st = await api("/api/stats");
-      const highRiskList = DB.instruments.filter(function(i) { return i.oem_status === "third_party" || i.status === "expired"; });
+      const highRiskList = DB.instruments.filter(function(i) { return i.oem_status === "third_party" || i.status === "expired" || i.high_risk || i.status === "sealed_tampered"; });
       let highRiskRows = "";
-      highRiskList.forEach(function(i) {
-        highRiskRows += '<tr><td><b>' + i.serial + '</b><div class="tiny">' + i.premises + '</div></td><td>' + chip("NON_COMPLIANT") + '</td><td><span class="bad-text">Expired / Third-party parts</span></td><td><button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-risk\')">Enforce ➔</button></td></tr>';
+      highRiskList.slice(0, 6).forEach(function(i) {
+        const reasons = [];
+        if (i.oem_status === "third_party") reasons.push("Third-party parts");
+        if (i.status === "expired") reasons.push("Verification overdue");
+        if (i.status === "sealed_tampered") reasons.push("Seal tampered");
+        if (i.risk_reason) reasons.push(i.risk_reason);
+        highRiskRows += '<tr><td><b>' + i.serial + '</b><div class="tiny">' + i.premises + '</div></td><td>' + chip("NON_COMPLIANT") + '</td><td><span class="bad-text">' + (reasons.join(" · ") || "High risk") + '</span></td><td><button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-risk\')">Enforce ➔</button></td></tr>';
       });
+      if (!highRiskRows) highRiskRows = '<tr><td colspan="4" class="tiny" style="text-align:center;padding:24px;">No high-risk instruments right now.</td></tr>';
+      const pendingReqs = (DB.gatc_requests || []).filter(function(r){ return r.status === "pending"; });
+      let reqRows = "";
+      pendingReqs.slice(0, 4).forEach(function(r) {
+        reqRows += '<tr><td class="mono"><b>' + r.code + '</b></td><td>' + r.officer_name + '<div class="tiny">→ ' + (r.gatc_code || "any GATC") + '</div></td><td><span class="mono tiny">' + r.serial + '</span></td><td>' + chip("under_review") + '</td></tr>';
+      });
+      if (!reqRows) reqRows = '<tr><td colspan="4" class="tiny" style="text-align:center;padding:18px;">No pending MO → GATC requests.</td></tr>';
+      const unassigned = DB.applications.filter(function(a){ return !a.assigned_officer || a.assigned_officer === "Unassigned"; }).length;
 
-      return shell("", '<p class="crumb">Government Dashboard · Ministry of Consumer Affairs</p><h1>Director General Enforcement Console</h1><p class="intro">Monitor statewide instrument compliance, prioritize high-risk enforcement queues, assign field inspections, and review audit trails.</p><div class="grid-4 mb"><div class="card kpi" onclick="go(\'admin-registry\')" style="cursor:pointer;"><b>' + st.instruments + '</b><span>Total Registered Instruments</span></div><div class="card kpi" onclick="go(\'admin-applications\')" style="cursor:pointer;"><b>' + DB.applications.length + '</b><span>Pending Applications</span></div><div class="card kpi" onclick="go(\'admin-inspections\')" style="cursor:pointer;"><b>4</b><span>Today\'s Inspections</span></div><div class="card kpi" onclick="go(\'admin-risk\')" style="cursor:pointer;background:#f8e4df;border-color:var(--danger);"><b style="color:var(--danger);">' + highRiskList.length + '</b><span style="color:var(--danger);">High-Risk Instruments</span></div></div><div class="grid-2 mb"><div class="card"><h3>Priority Risk &amp; Enforcement Queue</h3><p class="tiny mb">Instruments requiring immediate government intervention based on failed MPE or active complaints.</p><table class="table"><thead><tr><th>Instrument</th><th>Risk Level</th><th>Reason</th><th>Action</th></tr></thead><tbody>' + highRiskRows + '</tbody></table></div><div class="card"><h3>Government Activity Alerts</h3><div style="display:flex;flex-direction:column;gap:10px;"><div class="part"><span>New complaint filed on Bharat Fuels Dispenser #3</span>' + chip("warn") + '</div><div class="part"><span>Inspection assigned to Rahul Sharma</span>' + chip("info") + '</div><div class="part"><span>Instrument verification completed for Sharma Kirana</span>' + chip("verified") + '</div><div class="part"><span>Weighbridge model approval verified (C3)</span>' + chip("ok") + '</div></div></div></div>', "admin");
+      return shell("", '<p class="crumb">Government Dashboard · Ministry of Consumer Affairs</p><h1>Director General Enforcement Console</h1><p class="intro">Monitor statewide instrument compliance, prioritize high-risk enforcement queues, assign field officers, and review MO ↔ GATC workflows.</p>' +
+      '<div class="grid-4 mb">' +
+        '<div class="card kpi" onclick="go(\'admin-registry\')" style="cursor:pointer;"><b>' + st.instruments + '</b><span>Total Registered Instruments</span></div>' +
+        '<div class="card kpi" onclick="go(\'admin-gatc-network\')" style="cursor:pointer;background:#eef3f9;border-color:var(--navy);"><b style="color:var(--navy);">' + (st.gatcs_total || 0) + '</b><span style="color:var(--navy);">Total No. of GATC</span></div>' +
+        '<div class="card kpi" onclick="go(\'admin-applications\')" style="cursor:pointer;"><b>' + (st.applications_pending || 0) + '</b><span>Pending Applications</span><span class="tiny" style="display:block;text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400;">' + unassigned + ' unassigned</span></div>' +
+        '<div class="card kpi" onclick="go(\'admin-risk\')" style="cursor:pointer;background:#f8e4df;border-color:var(--danger);"><b style="color:var(--danger);">' + (st.high_risk || 0) + '</b><span style="color:var(--danger);">High-Risk Cases</span></div>' +
+      '</div>' +
+      '<div class="grid-4 mb">' +
+        '<div class="card kpi"><b>' + (st.applications_approved || 0) + '</b><span>Approved</span></div>' +
+        '<div class="card kpi"><b>' + (st.applications_rejected || 0) + '</b><span>Rejected</span></div>' +
+        '<div class="card kpi" onclick="go(\'admin-risk\')" style="cursor:pointer;"><b>' + (st.failed_cases || 0) + '</b><span>Failed Cases</span></div>' +
+        '<div class="card kpi" onclick="go(\'admin-inspections\')" style="cursor:pointer;"><b>' + (st.inspections_total || 0) + '</b><span>Inspections</span></div>' +
+      '</div>' +
+      '<div class="grid-2 mb"><div class="card"><h3>Priority Risk &amp; Enforcement Queue</h3><p class="tiny mb">Instruments requiring immediate government intervention based on failed MPE, tampered seals or third-party components.</p><table class="table"><thead><tr><th>Instrument</th><th>Risk Level</th><th>Reason</th><th>Action</th></tr></thead><tbody>' + highRiskRows + '</tbody></table></div>' +
+      '<div><div class="card"><h3>MO → GATC Requests (pending)</h3><p class="tiny mb">Metrology Officer requests awaiting a GATC decision.</p><table class="table"><thead><tr><th>Request</th><th>Officer → GATC</th><th>Instrument</th><th>Status</th></tr></thead><tbody>' + reqRows + '</tbody></table><button class="btn btn-navy mt" onclick="go(\'admin-gatc-requests\')">View All Requests</button></div>' +
+      '<div class="card mt"><h3>Government Activity Alerts</h3><div style="display:flex;flex-direction:column;gap:10px;">' + (DB.audit || []).slice(-4).reverse().map(function(e){ return '<div class="part"><span>' + (e.action || "") + ' — ' + (e.entity || "") + ' <span class="tiny">(' + (e.actor_name || "") + ')</span></span>' + chip("info") + '</div>'; }).join("") + '</div></div></div></div>', "admin");
     }
 
     async function adminRegistry() {
@@ -1375,6 +1653,33 @@
         r.style.display = r.innerText.toLowerCase().indexOf(q.toLowerCase()) !== -1 ? "" : "none";
       });
     }
+
+    async function flagRevokeInstrument(iid) {
+      const inst = DB.instruments.find(function(i){ return i.id === iid; });
+      if (!inst) return;
+      const cert = (DB.certificates || []).find(function(c){ return String(c.instrument_id) === String(iid) && c.status !== "Revoked"; });
+      const res = await confirmDialog({
+        title: "Flag & Revoke instrument?",
+        message: "Instrument <b class='mono'>" + inst.serial + "</b> will be flagged high-risk on the registry" + (cert ? " and its certificate <b class='mono'>" + cert.cert_no + "</b> will be <b>Revoked</b> (invalid on the public registry)" : "") + ".",
+        confirmText: cert ? "Flag & Revoke Certificate" : "Flag Instrument",
+        danger: true,
+        requireReason: cert ? { family: "revoke", label: "Reason for revocation", required: true } : null
+      });
+      if (!res.ok) return;
+      try {
+        if (cert) {
+          await api("/api/certificates/revoke", { method: "POST", body: { cert_no: cert.cert_no, instrument_id: iid, reason_code: res.reasonCode, note: res.reasonNote } });
+          toast("Certificate " + cert.cert_no + " revoked and instrument flagged.", "warn");
+        } else {
+          await api("/api/instruments/" + iid, { method: "PUT", body: Object.assign({}, inst, { high_risk: true, status: inst.status === "verified" ? "failed" : inst.status, risk_reason: reasonLabel("revoke", res.reasonCode) || "Flagged by admin" }) });
+          toast("Instrument flagged high-risk.", "warn");
+        }
+        await refreshBootstrap();
+        go("admin-risk");
+      } catch (e) {
+        toast(e.message || "Action failed", "error");
+      }
+    }
     async function adminInstrumentDetail() {
       const id = S.payload.id || 1;
       const d = DB.instruments.find(function(i) { return i.id === id; }) || DB.instruments[0];
@@ -1382,26 +1687,122 @@
       (d.compliance.passed || []).forEach(function(x) { passedList += '<li class="ok-text" style="font-size:13px;margin-bottom:6px;">' + x + '</li>'; });
       let issuesList = "";
       (d.compliance.issues || []).forEach(function(x) { issuesList += '<li class="bad-text" style="font-size:13px;margin-bottom:6px;">' + x + '</li>'; });
-      return shell("", '<p class="crumb">Instrument Dossier · ' + d.serial + '</p><div class="row"><h1>' + d.name + '</h1> ' + chip(d.status) + ' ' + chip(d.oem_status) + '</div><p class="intro">' + d.manufacturer + ' ' + d.model + ' · Premises: ' + d.premises + ', ' + d.district + '</p><div class="grid-2"><div><div class="card mb"><h3>Technical Specifications</h3><table class="table"><tr><th>Serial Number</th><td class="mono"><b>' + d.serial + '</b></td></tr><tr><th>Instrument Type</th><td>' + TYPE_LABEL[d.type] + '</td></tr><tr><th>Accuracy Class</th><td>Class ' + d.accuracy_class + ' (Max ' + d.max_kg + ' kg, e=' + d.e_value + ')</td></tr><tr><th>Model Approval</th><td class="mono">' + d.model_approval + '</td></tr><tr><th>LMO Stamp</th><td>' + d.stamp_lmo + ' (' + d.stamp_year + ' Q' + d.stamp_quarter + ')</td></tr><tr><th>Last Verification</th><td class="mono">' + d.last_verified + '</td></tr><tr><th>Next Due Date</th><td class="mono">' + d.next_due + '</td></tr></table></div><div class="card"><h3>Lifecycle Timeline</h3><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;"><div class="part"><span>✓ Registration — 12 Jan 2025</span>' + chip("verified") + '</div><div class="part"><span>✓ First Field Inspection — 12 Jan 2025</span>' + chip("ok") + '</div><div class="part"><span>✓ Instrument verified — ' + d.last_verified + '</span>' + chip("verified") + '</div><div class="part"><span>⚠ Next re-verification due — ' + d.next_due + '</span>' + chip("warn") + '</div></div></div></div><div><div class="verdict-hero ' + d.compliance.verdict + '"><h2>Compliance: ' + d.compliance.verdict + '</h2><p>Risk Score: ' + (d.oem_status === "third_party" ? "88 / 100 (HIGH RISK)" : "12 / 100 (LOW RISK)") + '</p></div><div class="card mb"><h3>Compliance &amp; Inspection Audit</h3><h4 class="ok-text mt">Checks Passed</h4><ul>' + passedList + '</ul>' + (issuesList ? '<h4 class="bad-text mt">Issues &amp; Violations</h4><ul>' + issuesList + '</ul>' : '<p class="tiny mt">No violations reported. Lead seal wire and security stamp are fully intact.</p>') + '</div><div class="card"><h3>Enforcement Actions</h3><p class="tiny mb">Take immediate administrative action on this instrument file.</p><div style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-saffron" onclick="go(\'admin-assign\', {iid:' + d.id + '})">Assign Field Inspection</button><button class="btn btn-danger" onclick="alert(\'Instrument flagged and seal confiscated.\')">Flag &amp; Revoke</button><button class="btn btn-navy" onclick="openComplaintModal()">Report an Issue</button></div></div></div></div>', "admin");
+      return shell("", '<p class="crumb">Instrument Dossier · ' + d.serial + '</p><div class="row"><h1>' + d.name + '</h1> ' + chip(d.status) + ' ' + chip(d.oem_status) + '</div><p class="intro">' + d.manufacturer + ' ' + d.model + ' · Premises: ' + d.premises + ', ' + d.district + '</p><div class="grid-2"><div><div class="card mb"><h3>Technical Specifications</h3><table class="table"><tr><th>Serial Number</th><td class="mono"><b>' + d.serial + '</b></td></tr><tr><th>Instrument Type</th><td>' + TYPE_LABEL[d.type] + '</td></tr><tr><th>Accuracy Class</th><td>Class ' + d.accuracy_class + ' (Max ' + d.max_kg + ' kg, e=' + d.e_value + ')</td></tr><tr><th>Model Approval</th><td class="mono">' + d.model_approval + '</td></tr><tr><th>LMO Stamp</th><td>' + d.stamp_lmo + ' (' + d.stamp_year + ' Q' + d.stamp_quarter + ')</td></tr><tr><th>Last Verification</th><td class="mono">' + d.last_verified + '</td></tr><tr><th>Next Due Date</th><td class="mono">' + d.next_due + '</td></tr></table></div><div class="card"><h3>Lifecycle Timeline</h3><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;"><div class="part"><span>✓ Registration — 12 Jan 2025</span>' + chip("verified") + '</div><div class="part"><span>✓ First Field Inspection — 12 Jan 2025</span>' + chip("ok") + '</div><div class="part"><span>✓ Instrument verified — ' + d.last_verified + '</span>' + chip("verified") + '</div><div class="part"><span>⚠ Next re-verification due — ' + d.next_due + '</span>' + chip("warn") + '</div></div></div></div><div><div class="verdict-hero ' + d.compliance.verdict + '"><h2>Compliance: ' + d.compliance.verdict + '</h2><p>Risk Score: ' + (d.oem_status === "third_party" ? "88 / 100 (HIGH RISK)" : "12 / 100 (LOW RISK)") + '</p></div><div class="card mb"><h3>Compliance &amp; Inspection Audit</h3><h4 class="ok-text mt">Checks Passed</h4><ul>' + passedList + '</ul>' + (issuesList ? '<h4 class="bad-text mt">Issues &amp; Violations</h4><ul>' + issuesList + '</ul>' : '<p class="tiny mt">No violations reported. Lead seal wire and security stamp are fully intact.</p>') + '</div><div class="card"><h3>Enforcement Actions</h3><p class="tiny mb">Take immediate administrative action on this instrument file.</p><div style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-saffron" onclick="go(\'admin-assign\', {iid:' + d.id + '})">Assign Field Inspection</button><button class="btn btn-danger" onclick="flagRevokeInstrument(' + d.id + ')">Flag &amp; Revoke</button><button class="btn btn-navy" onclick="openComplaintModal()">Report an Issue</button></div></div></div></div>', "admin");
     }
 
     async function adminApplications() {
       let appRows = "";
       DB.applications.forEach(function(a) {
-        appRows += '<tr><td class="mono"><b>' + a.public_id + '</b></td><td><span class="mono">' + a.serial + '</span><div class="tiny">' + a.instrument_name + '</div></td><td>' + a.applicant_name + '<div class="tiny">' + a.org + '</div></td><td>' + a.district + '</td><td>' + a.kind + '</td><td>' + chip(a.status) + '</td><td>' + a.assigned_officer + '</td><td>' + (a.gatc_id ? '<span class="tiny">GATC: ' + ((DB.gatcs.find(function(g){return g.id === a.gatc_id;}) || {}).code || "Assigned") + '</span>' : '<button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-gatc-assign\', {aid:' + a.id + '})">Assign GATC</button>') + '</td></tr>';
+        const unassigned = !a.assigned_officer || a.assigned_officer === "Unassigned";
+        const assignChip = unassigned ? chip("unassigned") : chip("assigned") + ' <div class="tiny mono">' + a.assigned_officer + '</div>';
+        const failInfo = a.status === "failed" ? '<div class="tiny bad-text">' + (a.failure_reason_label || reasonLabel("failure", a.failure_reason_code) || "") + '</div>' : (a.status === "rejected" ? '<div class="tiny bad-text">' + (a.rejection_reason || "") + '</div>' : "");
+        appRows += '<tr><td class="mono"><b>' + a.public_id + '</b><div class="tiny">' + (a.submitted_date || "") + '</div></td><td><span class="mono">' + a.serial + '</span><div class="tiny">' + a.instrument_name + '</div></td><td>' + a.applicant_name + '<div class="tiny">' + a.org + '</div></td><td>' + a.district + '</td><td>' + chip(a.status) + failInfo + '</td><td>' + assignChip + '</td><td>' + (a.gatc_id ? '<span class="tiny">GATC: ' + ((DB.gatcs.find(function(g){return g.id === a.gatc_id;}) || {}).code || "Assigned") + '</span>' : '<span class="tiny muted">—</span>') + '</td><td><div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn ' + (unassigned ? "btn-saffron" : "btn-navy") + '" style="padding:6px 12px;font-size:12px;" onclick="openAssignOfficerModal(' + a.id + ')">' + (unassigned ? "Assign Officer" : "Reassign") + '</button>' + (a.gatc_id ? '' : '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-gatc-assign\', {aid:' + a.id + '})">Assign GATC</button>') + '</div></td></tr>';
       });
-      return shell("", '<p class="crumb">Government Dashboard</p><h1>Application Management</h1><p class="intro">Review first-time verifications, re-verifications, and repair filings under Section 24.</p><div class="card"><table class="table"><thead><tr><th>App ID</th><th>Instrument</th><th>Applicant</th><th>District</th><th>Kind</th><th>Status</th><th>Assigned Officer</th><th>Action</th></tr></thead><tbody>' + appRows + '</tbody></table></div>', "admin");
+      const total = DB.applications.length;
+      const unassignedCount = DB.applications.filter(function(a){ return !a.assigned_officer || a.assigned_officer === "Unassigned"; }).length;
+      return shell("", '<p class="crumb">Government Dashboard</p><h1>Application Management</h1><p class="intro">Review first-time verifications, re-verifications, and repair filings under Section 24. Assign each application to a Metrology Officer — assigned officers see it instantly in their queue.</p>' +
+      '<div class="grid-3 mb">' + kpi(total, "Total Applications") + kpi(unassignedCount, "Unassigned") + kpi(total - unassignedCount, "Assigned") + '</div>' +
+      '<div class="card" style="overflow-x:auto;"><table class="table"><thead><tr><th>App ID</th><th>Instrument</th><th>Applicant</th><th>District</th><th>Status</th><th>Assigned Officer</th><th>GATC</th><th>Actions</th></tr></thead><tbody>' + appRows + '</tbody></table></div>', "admin");
+    }
+
+    let OFFICERS_CACHE = null;
+    async function fetchOfficers() {
+      if (OFFICERS_CACHE) return OFFICERS_CACHE;
+      const r = await api("/api/officers");
+      OFFICERS_CACHE = r.officers || [];
+      return OFFICERS_CACHE;
+    }
+
+    async function openAssignOfficerModal(aid) {
+      const a = DB.applications.find(function(x){ return x.id === aid; });
+      if (!a) return;
+      let officers = [];
+      try { officers = await fetchOfficers(); } catch (e) { toast(e.message || "Could not load officers", "error"); return; }
+      const existing = document.getElementById("assign-officer-modal"); if (existing) existing.remove();
+      const current = a.officer_id ? String(a.officer_id) : "";
+      const opts = officers.map(function(o){
+        return '<option value="' + o.id + '"' + (current === String(o.id) ? ' selected' : '') + '>' + o.name + ' (' + (o.lmo_code || "LMO") + ') — ' + o.district + '</option>';
+      }).join("");
+      const reassign = !!current;
+      const wrap = document.createElement("div");
+      wrap.id = "assign-officer-modal";
+      wrap.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.58);display:grid;place-items:center;z-index:10001;padding:18px;";
+      wrap.innerHTML = '<div class="card" style="width:100%;max-width:520px;background:#fff;margin:0;"><h3>' + (reassign ? "Reassign Officer" : "Assign Officer") + '</h3><p class="tiny mb">Application <b class="mono">' + a.public_id + '</b> · ' + a.serial + ' — ' + a.instrument_name + '<br>Applicant: ' + a.applicant_name + ' (' + a.org + '), ' + a.district + '</p>' +
+      '<div class="field"><label>Metrology Officer *</label><select id="assign-officer-select"><option value="">— Select officer —</option>' + opts + '</select></div>' +
+      '<div class="field"><label>Note to officer (optional)</label><input id="assign-note" placeholder="e.g. Priority inspection needed" /></div>' +
+      (reassign ? '<div class="reason-box"><b>Reassignment</b>This application is currently assigned to <b>' + a.assigned_officer + '</b>. Reassigning will move it to the new officer\'s queue.</div>' : '') +
+      '<div class="row mt" style="justify-content:flex-end;"><button class="btn btn-ghost" onclick="document.getElementById(\'assign-officer-modal\').remove()">Cancel</button><button class="btn btn-saffron" id="assign-officer-confirm">' + (reassign ? "Confirm Reassignment" : "Confirm Assignment") + '</button></div><div id="assign-officer-out" class="mt"></div></div>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", function(e){ if (e.target === wrap) wrap.remove(); });
+      wrap.querySelector("#assign-officer-confirm").onclick = async function() {
+        const sel = wrap.querySelector("#assign-officer-select");
+        const officerId = sel.value;
+        if (!officerId) { sel.style.borderColor = "var(--danger)"; return; }
+        const officer = officers.find(function(o){ return String(o.id) === String(officerId); });
+        if (reassign) {
+          const ok = await confirmDialog({
+            title: "Confirm reassignment",
+            message: "Move <b class='mono'>" + a.public_id + "</b> from <b>" + a.assigned_officer + "</b> to <b>" + officer.name + " (" + (officer.lmo_code || "LMO") + ")</b>?",
+            confirmText: "Reassign",
+            danger: false
+          });
+          if (!ok.ok) return;
+        }
+        try {
+          const r = await api("/api/applications/" + aid + "/assign", { method: "POST", body: { officer_id: Number(officerId) } });
+          if (r.application) {
+            const idx = DB.applications.findIndex(function(x){ return x.id === aid; });
+            if (idx >= 0) DB.applications[idx] = Object.assign({}, DB.applications[idx], r.application);
+          }
+          wrap.remove();
+          addNotification("officer", "Application Assigned", a.public_id + " (" + a.serial + ") has been assigned to you by " + (S.user ? S.user.name : "Admin") + ".", "📋", "officer-queue");
+          toast(a.public_id + " assigned to " + officer.name + ".", "ok");
+          await refreshBootstrap();
+          go("admin-applications");
+        } catch (e) {
+          wrap.querySelector("#assign-officer-out").innerHTML = '<div class="err">' + (e.message || "Assignment failed") + '</div>';
+        }
+      };
     }
 
     async function adminAssign() {
       const iid = S.payload.iid || 1;
       const inst = DB.instruments.find(function(i) { return i.id === iid; }) || DB.instruments[0];
-      return shell("", '<p class="crumb">Enforcement Workflow · Step 2: Assign Inspection</p><h1>Schedule Field Inspection</h1><p class="intro">Assign a qualified Legal Metrology Inspector to perform MPE testing and lead sealing on <b class="mono">' + inst.serial + '</b>.</p><div class="card" style="max-width:600px;"><div class="field"><label>Instrument</label><input class="mono" readonly value="' + inst.serial + ' — ' + inst.name + '" /></div><div class="field"><label>Select Inspecting Officer</label><select id="assign-officer"><option>Rahul Sharma (LMO-LKO-01) — 6 pending</option><option>Priya Verma (LMO-LKO-02) — 3 pending</option><option>Manoj Kumar (LMO-KNP-01) — 8 pending</option></select></div><div class="grid-2"><div class="field"><label>Inspection Date</label><input type="date" id="assign-date" value="2026-08-28" /></div><div class="field"><label>Priority Level</label><select id="assign-prio"><option>High Priority</option><option>Standard</option></select></div></div><div class="field"><label>Special Instructions</label><textarea id="assign-notes" rows="3">Verify load cell serial number and check lead wire seal integrity.</textarea></div><button class="btn btn-saffron btn-full" onclick="confirmAssignment()">Confirm &amp; Dispatch Inspection</button><div id="assign-out" class="mt"></div></div>', "admin");
+      let officers = [];
+      try { officers = await fetchOfficers(); } catch (e) {}
+      const officerOpts = (officers.length ? officers : [{ id: 2, name: "Rahul Sharma", lmo_code: "LMO-LKO-01", district: "Lucknow" }]).map(function(o){
+        return '<option value="' + o.id + '">' + o.name + ' (' + (o.lmo_code || "LMO") + ') — ' + o.district + '</option>';
+      }).join("");
+      const linkedApp = DB.applications.find(function(a){ return a.instrument_id === inst.id && (!a.assigned_officer || a.assigned_officer === "Unassigned"); });
+      return shell("", '<p class="crumb">Enforcement Workflow · Step 2: Assign Inspection</p><h1>Schedule Field Inspection</h1><p class="intro">Assign a qualified Legal Metrology Inspector to perform MPE testing and lead sealing on <b class="mono">' + inst.serial + '</b>.</p><div class="card" style="max-width:600px;"><div class="field"><label>Instrument</label><input class="mono" readonly value="' + inst.serial + ' — ' + inst.name + '" /></div><div class="field"><label>Linked Application</label><input class="mono" readonly value="' + (linkedApp ? linkedApp.public_id + " — " + linkedApp.applicant_name : "No open application for this instrument") + '" /></div><div class="field"><label>Select Inspecting Officer</label><select id="assign-officer">' + officerOpts + '</select></div><div class="grid-2"><div class="field"><label>Inspection Date</label><input type="date" id="assign-date" value="' + new Date(Date.now() + 86400000).toISOString().slice(0, 10) + '" /></div><div class="field"><label>Priority Level</label><select id="assign-prio"><option>High Priority</option><option>Standard</option></select></div></div><div class="field"><label>Special Instructions</label><textarea id="assign-notes" rows="3">Verify load cell serial number and check lead wire seal integrity.</textarea></div><button class="btn btn-saffron btn-full" onclick="confirmAssignment(' + inst.id + ')">Confirm &amp; Dispatch Inspection</button><div id="assign-out" class="mt"></div></div>', "admin");
     }
 
-    function confirmAssignment() {
-      $("#assign-out").innerHTML = '<div class="card" style="background:#e4f2ea;color:var(--green-d);border:1px solid var(--green);">Inspection successfully assigned to <b>Rahul Sharma</b> for 28 Aug 2026. Status updated to <b>Scheduled</b>.</div>';
-      setTimeout(function() { go("admin-inspections"); }, 1500);
+    async function confirmAssignment(iid) {
+      const inst = DB.instruments.find(function(i) { return i.id === iid; }) || DB.instruments[0];
+      const linkedApp = DB.applications.find(function(a){ return a.instrument_id === inst.id; });
+      const sel = $("#assign-officer");
+      const officerId = sel ? sel.value : "";
+      if (!linkedApp) {
+        $("#assign-out").innerHTML = '<div class="err">No application exists for this instrument. The owner/trader must apply for verification first, or assign an officer from the Applications page.</div>';
+        return;
+      }
+      if (!officerId) { $("#assign-out").innerHTML = '<div class="err">Select an inspecting officer.</div>'; return; }
+      const ok = await confirmDialog({
+        title: "Dispatch inspection?",
+        message: "Assign <b class='mono'>" + linkedApp.public_id + "</b> (" + inst.serial + ") to officer #" + officerId + " for field inspection?",
+        confirmText: "Dispatch",
+        danger: false
+      });
+      if (!ok.ok) return;
+      try {
+        await api("/api/applications/" + linkedApp.id + "/assign", { method: "POST", body: { officer_id: Number(officerId) } });
+        addNotification("officer", "Inspection Assigned", linkedApp.public_id + " (" + inst.serial + ") assigned for field inspection.", "📋", "officer-queue");
+        toast("Inspection dispatched — officer notified.", "ok");
+        await refreshBootstrap();
+        go("admin-applications");
+      } catch (e) {
+        $("#assign-out").innerHTML = '<div class="err">' + (e.message || "Assignment failed") + '</div>';
+      }
     }
 
 
@@ -1471,11 +1872,133 @@
     }
 
     async function adminInspections() {
-      return shell("", '<p class="crumb">Government Dashboard</p><h1>Field Inspections &amp; MPE Testing</h1><p class="intro">Statewide scheduled and completed field test sheets against OIML R 76 tolerances.</p><div class="card"><table class="table"><thead><tr><th>Inspection ID</th><th>Instrument</th><th>Officer</th><th>Scheduled Date</th><th>Status</th><th>Result</th></tr></thead><tbody><tr><td class="mono">INS-8812</td><td><span class="mono">LM-UP-000127</span><div class="tiny">Sharma Kirana</div></td><td>Rahul Sharma</td><td class="mono">2026-08-28</td><td>' + chip("inspection_scheduled") + '</td><td>—</td></tr><tr><td class="mono">INS-8809</td><td><span class="mono">LM-UP-000431</span><div class="tiny">Bharat Fuels #3</div></td><td>Priya Verma</td><td class="mono">2026-08-20</td><td>' + chip("verified") + '</td><td><span class="bad-text">Failed (+1.4e error)</span></td></tr></tbody></table></div>', "admin");
+      const insps = (DB.inspections || []).slice().sort(function(a,b){ return String(b.inspected_on || "").localeCompare(String(a.inspected_on || "")); });
+      let rows = "";
+      insps.forEach(function(i) {
+        const photos = (i.photos || []).map(function(p){ return '<a href="' + p.url + '" target="_blank"><img class="insp-photo" src="' + p.url + '" alt="photo"></a>'; }).join(" ") || '<span class="tiny">—</span>';
+        const gps = i.gps && i.gps.lat != null ? '<a class="gps-chip" target="_blank" href="https://www.openstreetmap.org/?mlat=' + i.gps.lat + '&mlon=' + i.gps.lng + '#map=16/' + i.gps.lat + '/' + i.gps.lng + '">📍 ' + Number(i.gps.lat).toFixed(4) + ', ' + Number(i.gps.lng).toFixed(4) + '</a>' : '<span class="tiny">No GPS</span>';
+        rows += '<tr><td class="mono"><b>' + i.code + '</b><div class="tiny">' + (i.inspected_on || "") + '</div></td>' +
+        '<td><span class="mono">' + i.serial + '</span><div class="tiny">' + i.instrument_name + '</div></td>' +
+        '<td>' + (i.officer_name || "—") + '<div class="tiny mono">' + (i.officer_code || "") + '</div></td>' +
+        '<td>' + chip(i.verdict === "pass" ? "pass" : "fail") + (i.verdict === "fail" ? '<div class="tiny bad-text">' + (i.failure_reason_label || "") + '</div>' : '') + '</td>' +
+        '<td>' + photos + '</td><td>' + gps + '</td></tr>';
+      });
+      if (!rows) rows = '<tr><td colspan="6" class="tiny" style="text-align:center;padding:30px;">No inspections recorded yet.</td></tr>';
+      const passCount = insps.filter(function(i){ return i.verdict === "pass"; }).length;
+      return shell("", '<p class="crumb">Government Dashboard</p><h1>Field Inspections &amp; MPE Testing</h1><p class="intro">Statewide field inspection records — measurements, officer, photos and GPS captured on site.</p>' +
+      '<div class="grid-3 mb">' + kpi(insps.length, "Total Inspections") + kpi(passCount, "Passed") + kpi(insps.length - passCount, "Failed") + '</div>' +
+      '<div class="card" style="overflow-x:auto;"><table class="table"><thead><tr><th>Inspection</th><th>Instrument</th><th>Officer</th><th>Result</th><th>Photos</th><th>GPS</th></tr></thead><tbody>' + rows + '</tbody></table></div>', "admin");
+    }
+
+    async function adminGatcRequests() {
+      const reqs = (DB.gatc_requests || []).slice().sort(function(a,b){ return String(b.created_on || "").localeCompare(String(a.created_on || "")); });
+      let rows = "";
+      reqs.forEach(function(r) {
+        rows += '<tr><td class="mono"><b>' + r.code + '</b><div class="tiny">' + (r.created_on || "") + '</div></td>' +
+        '<td>' + r.officer_name + '<div class="tiny mono">' + (r.officer_code || "") + '</div></td>' +
+        '<td>' + (r.gatc_code || "Any") + '</td>' +
+        '<td><span class="mono tiny">' + (r.public_id || "—") + '</span><div class="mono tiny">' + r.serial + '</div></td>' +
+        '<td style="max-width:200px;"><div class="tiny">' + (r.message || "") + '</div></td>' +
+        '<td>' + chip(r.status === "pending" ? "under_review" : r.status) + (r.status === "rejected" ? '<div class="tiny bad-text">' + (r.reason_label || reasonLabel("gatc_rejection", r.reason_code)) + '</div>' : '') + '</td>' +
+        '<td class="tiny">' + (r.decided_by || "Awaiting GATC") + '</td></tr>';
+      });
+      if (!rows) rows = '<tr><td colspan="7" class="tiny" style="text-align:center;padding:30px;">No MO → GATC requests yet.</td></tr>';
+      return shell("", '<p class="crumb">Government Dashboard · Workflow Oversight</p><h1>MO ↔ GATC Requests</h1><p class="intro">Full oversight of requests sent by Metrology Officers to Government Approved Test Centres, including approvals and rejection reasons.</p>' +
+      '<div class="grid-3 mb">' + kpi(reqs.length, "Total Requests") + kpi(reqs.filter(function(r){return r.status === "pending";}).length, "Pending") + kpi(reqs.filter(function(r){return r.status === "rejected";}).length, "Rejected") + '</div>' +
+      '<div class="card" style="overflow-x:auto;"><table class="table"><thead><tr><th>Request</th><th>From (MO)</th><th>To (GATC)</th><th>Application / Instrument</th><th>Message</th><th>Status</th><th>Decided By</th></tr></thead><tbody>' + rows + '</tbody></table></div>', "admin");
     }
 
     async function adminRisk() {
-      return shell("", '<p class="crumb">Government Dashboard · Hero Feature</p><h1>Risk &amp; Enforcement Priority Queue</h1><p class="intro">Prioritize instruments requiring government intervention based on failed inspections, active consumer complaints, and overdue verification status.</p><div class="card"><table class="table"><thead><tr><th>Instrument</th><th>Risk Score</th><th>Risk Factors</th><th>Status</th><th>Recommended Action</th></tr></thead><tbody><tr><td><b>LM-UP-000431</b><div class="tiny">Bharat Fuels Dispenser #3, Lucknow</div></td><td><b style="color:var(--danger)">88 / 100</b><br><span class="chip bad">HIGH RISK</span></td><td>• Failed last inspection<br>• Active consumer complaint<br>• Verification overdue</td><td>' + chip("NON_COMPLIANT") + '</td><td><button class="btn btn-danger" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-assign\', {iid:2})">Immediate Inspection</button></td></tr><tr><td><b>LM-UP-000127</b><div class="tiny">Sharma Kirana Platform Scale</div></td><td><b style="color:var(--warn)">45 / 100</b><br><span class="chip warn">MEDIUM RISK</span></td><td>• Minor seal wire slackness reported</td><td>' + chip("verified") + '</td><td><button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-instrument-detail\', {id:1})">Review File</button></td></tr></tbody></table></div>', "admin");
+      // Failed cases: failed inspections + failed applications with structured reasons
+      const failedInsps = (DB.inspections || []).filter(function(i){ return i.verdict === "fail"; });
+      const failedApps = DB.applications.filter(function(a){ return a.status === "failed"; });
+      const reasonCounts = {};
+      failedInsps.concat(failedApps.map(function(a){ return { failure_reason_label: a.failure_reason_label || reasonLabel("failure", a.failure_reason_code), failure_reason_code: a.failure_reason_code }; })).forEach(function(x) {
+        const k = x.failure_reason_label || reasonLabel("failure", x.failure_reason_code) || "Unknown";
+        reasonCounts[k] = (reasonCounts[k] || 0) + 1;
+      });
+      let failRows = "";
+      failedInsps.forEach(function(i) {
+        failRows += '<tr><td class="mono"><b>' + i.code + '</b><div class="tiny">' + (i.inspected_on || "") + '</div></td><td><span class="mono">' + i.serial + '</span><div class="tiny">' + i.instrument_name + '</div></td><td>' + chip("fail") + '</td><td><span class="chip bad">' + (i.failure_reason_label || "Unknown") + '</span>' + (i.failure_note ? '<div class="tiny">' + i.failure_note + '</div>' : '') + '</td><td>' + (i.officer_name || "—") + '</td><td>' + (i.gps && i.gps.lat != null ? '<a class="gps-chip" target="_blank" href="https://www.openstreetmap.org/?mlat=' + i.gps.lat + '&mlon=' + i.gps.lng + '">📍 Map</a>' : '<span class="tiny">—</span>') + '</td></tr>';
+      });
+      if (!failRows) failRows = '<tr><td colspan="6" class="tiny" style="text-align:center;padding:24px;">No failed inspections recorded.</td></tr>';
+      const highRiskList = DB.instruments.filter(function(i) { return i.high_risk || i.status === "expired" || i.oem_status === "third_party" || i.status === "sealed_tampered"; });
+      let hrRows = "";
+      highRiskList.forEach(function(i) {
+        const reasons = [];
+        if (i.oem_status === "third_party") reasons.push(reasonLabel("failure", "third_party_issue"));
+        if (i.status === "sealed_tampered") reasons.push(reasonLabel("failure", "tampered_seal"));
+        if (i.status === "expired") reasons.push(reasonLabel("failure", "overdue_verification"));
+        if (i.risk_reason) reasons.push(i.risk_reason);
+        hrRows += '<tr><td><b class="mono">' + i.serial + '</b><div class="tiny">' + i.name + '</div></td><td>' + i.district + '<div class="tiny">' + (i.premises || "") + '</div></td><td><span class="chip bad">HIGH RISK</span><div class="tiny mt">' + reasons.map(function(r){ return "• " + r; }).join("<br>") + '</div></td><td>' + chip(i.status) + '</td><td><button class="btn btn-danger" style="padding:6px 12px;font-size:12px;" onclick="go(\'admin-assign\', {iid:' + i.id + '})">Immediate Inspection</button></td></tr>';
+      });
+      if (!hrRows) hrRows = '<tr><td colspan="5" class="tiny" style="text-align:center;padding:24px;">No high-risk instruments.</td></tr>';
+
+      // Authorization requests (outside jurisdiction)
+      const auths = (DB.authorizations || []).slice().sort(function(a,b){
+        const rank = function(s){ return s === "authorization_requested" ? 0 : 1; };
+        return rank(a.status) - rank(b.status) || String(b.created_on || "").localeCompare(String(a.created_on || ""));
+      });
+      let authRows = "";
+      auths.forEach(function(a) {
+        let action = '<span class="tiny">' + (a.decided_by ? "Decided by " + a.decided_by : "—") + '</span>';
+        if (a.status === "authorization_requested") {
+          action = '<div style="display:flex;gap:6px;"><button class="btn btn-ok" style="padding:6px 12px;font-size:12px;" onclick="decideAuthorization(' + a.id + ',\'authorized\')">Authorize</button><button class="btn btn-danger" style="padding:6px 12px;font-size:12px;" onclick="decideAuthorization(' + a.id + ',\'denied\')">Deny</button></div>';
+        }
+        authRows += '<tr><td class="mono"><b>' + a.code + '</b><div class="tiny">' + (a.created_on || "") + '</div></td>' +
+        '<td>' + a.officer_name + '<div class="tiny mono">' + (a.officer_code || "") + '</div></td>' +
+        '<td>' + a.entity_type + ' <span class="mono tiny">' + a.entity_id + '</span><div class="tiny">' + (a.user_label || "") + '</div></td>' +
+        '<td>' + (a.location || a.district || "—") + '<div class="tiny">User: <span class="mono">' + (a.user_id || "—") + '</span> · Group: <span class="mono">' + (a.group_id || "—") + '</span></div></td>' +
+        '<td>' + (a.reason_label || reasonLabel("authorization", a.reason_code)) + (a.reason_note ? '<div class="tiny">' + a.reason_note + '</div>' : '') + '</td>' +
+        '<td>' + chip(a.status) + '</td><td>' + action + '</td></tr>';
+      });
+      if (!authRows) authRows = '<tr><td colspan="7" class="tiny" style="text-align:center;padding:24px;">No authorization requests from officers.</td></tr>';
+
+      const reasonBars = Object.keys(reasonCounts).map(function(k) {
+        const pct = Math.round((reasonCounts[k] / Math.max(1, failedInsps.length + failedApps.length)) * 100);
+        return '<div><div class="row"><span>' + k + '</span><b>' + reasonCounts[k] + '</b></div><div class="progress"><span style="width:' + pct + '%;background:var(--danger);"></span></div></div>';
+      }).join("") || '<p class="tiny">No failure reasons recorded yet.</p>';
+
+      return shell("", '<p class="crumb">Government Dashboard · Enforcement</p><h1>Risk, Failed Cases &amp; Jurisdiction</h1><p class="intro">Failed verifications with structured reasons (third-party issue, tampered seal, MPE exceeded...), high-risk instruments, and outside-jurisdiction authorization requests.</p>' +
+      '<div class="grid-3 mb">' + kpi(failedInsps.length + failedApps.length, "Failed Cases") + kpi(highRiskList.length, "High-Risk Instruments") + kpi(auths.filter(function(a){return a.status === "authorization_requested";}).length, "Authorization Requests") + '</div>' +
+      '<div class="grid-2 mb"><div class="card"><h3>Failure Reasons (structured)</h3><div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">' + reasonBars + '</div></div>' +
+      '<div class="card"><h3>Failed Inspections &amp; Applications</h3><div style="overflow-x:auto;"><table class="table"><thead><tr><th>Case</th><th>Instrument</th><th>Result</th><th>Reason</th><th>Officer</th><th>GPS</th></tr></thead><tbody>' + failRows + '</tbody></table></div></div></div>' +
+      '<div class="card mb"><h3>High-Risk Instruments</h3><div style="overflow-x:auto;"><table class="table"><thead><tr><th>Instrument</th><th>District</th><th>Risk</th><th>Status</th><th>Action</th></tr></thead><tbody>' + hrRows + '</tbody></table></div></div>' +
+      '<div class="card"><h3>Outside Jurisdiction — Authorization Requests</h3><p class="tiny mb">Officers request authorization to handle cases outside their district. Approve or deny each request.</p><div style="overflow-x:auto;"><table class="table"><thead><tr><th>Request</th><th>Officer</th><th>Entity</th><th>Location · User · Group</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody>' + authRows + '</tbody></table></div></div>', "admin");
+    }
+
+    async function decideAuthorization(aid, decision) {
+      const a = (DB.authorizations || []).find(function(x){ return Number(x.id) === Number(aid); });
+      if (!a) return;
+      let note = "";
+      if (decision === "denied") {
+        const res = await confirmDialog({
+          title: "Deny authorization?",
+          message: "Request <b class='mono'>" + a.code + "</b> from " + a.officer_name + " will be <b>denied</b>. The officer keeps the case out of their queue.",
+          confirmText: "Deny Authorization",
+          danger: true
+        });
+        if (!res.ok) return;
+        note = res.reasonNote;
+      } else {
+        const res = await confirmDialog({
+          title: "Authorize out-of-jurisdiction case?",
+          message: "Officer <b>" + a.officer_name + "</b> will be authorized to handle <b>" + a.entity_type + " " + a.entity_id + "</b> located in <b>" + (a.location || a.district || "another district") + "</b>.",
+          confirmText: "Authorize",
+          danger: false
+        });
+        if (!res.ok) return;
+        note = res.reasonNote;
+      }
+      try {
+        const r = await api("/api/authorizations/" + aid + "/decision", { method: "POST", body: { decision: decision, note: note } });
+        addNotification("officer", decision === "authorized" ? "Authorization Approved" : "Authorization Denied", r.authorization.code + ": " + (decision === "authorized" ? "you are now authorized to handle this case." : "your authorization request was denied."), decision === "authorized" ? "✅" : "❌", "officer-highrisk");
+        toast(decision === "authorized" ? "Authorization granted." : "Authorization denied.", decision === "authorized" ? "ok" : "warn");
+        await refreshBootstrap();
+        go("admin-risk");
+      } catch (e) {
+        toast(e.message || "Decision failed", "error");
+      }
     }
 
     async function adminComplaints() {
@@ -1490,8 +2013,111 @@
       return shell("", '<p class="crumb">Government Dashboard</p><h1>Officer Workload &amp; Performance</h1><p class="intro">Monitor active inspection workloads across district inspectors.</p><div class="card"><table class="table"><thead><tr><th>Officer Name</th><th>ID / Zone</th><th>District</th><th>Assigned</th><th>Completed</th><th>Pending</th><th>Workload Status</th></tr></thead><tbody><tr><td><b>Rahul Sharma</b></td><td class="mono">LMO-LKO-01</td><td>Lucknow</td><td>24</td><td>18</td><td>6</td><td>' + chip("ok") + ' (Balanced)</td></tr><tr><td><b>Priya Verma</b></td><td class="mono">LMO-LKO-02</td><td>Lucknow</td><td>29</td><td>27</td><td>2</td><td>' + chip("ok") + ' (Optimal)</td></tr><tr><td><b>Manoj Kumar</b></td><td class="mono">LMO-KNP-01</td><td>Kanpur Nagar</td><td>38</td><td>26</td><td>12</td><td>' + chip("warn") + ' (Overloaded)</td></tr></tbody></table></div>', "admin");
     }
 
-    async function adminAnalytics() {
-      return shell("", '<p class="crumb">Government Dashboard</p><h1>Reports &amp; Analytics</h1><p class="intro">Statewide compliance distribution and inspection success rates.</p><div class="grid-2"><div class="card"><h3>Instruments by District</h3><div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;"><div><div class="row"><span>Lucknow</span><b>4,820</b></div><div class="progress"><span style="width:75%"></span></div></div><div><div class="row"><span>Kanpur Nagar</span><b>3,150</b></div><div class="progress"><span style="width:55%"></span></div></div><div><div class="row"><span>Varanasi</span><b>2,410</b></div><div class="progress"><span style="width:42%"></span></div></div><div><div class="row"><span>Agra</span><b>2,106</b></div><div class="progress"><span style="width:38%"></span></div></div></div></div><div class="card"><h3>Verification Pass vs Failure Ratio</h3><div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;"><div><div class="row"><span class="ok-text">Passed &amp; Certified</span><b>88.4%</b></div><div class="progress"><span style="width:88%;background:var(--green)"></span></div></div><div><div class="row"><span class="bad-text">Failed / Third-party</span><b>8.2%</b></div><div class="progress"><span style="width:8%;background:var(--danger)"></span></div></div><div><div class="row"><span class="warn-text">Expired / Due</span><b>3.4%</b></div><div class="progress"><span style="width:3%;background:var(--warn)"></span></div></div></div></div></div>', "admin");
+    // ---------------- SVG chart helpers (no external chart lib needed) ----------------
+    function svgLineChart(series, color) {
+      // series: [{date, count}]
+      if (!series.length) return '<p class="tiny" style="text-align:center;padding:24px;">No data in this period.</p>';
+      const W = 560, H = 180, P = 28;
+      const max = Math.max(1, Math.max.apply(null, series.map(function(d){ return d.count; })));
+      const stepX = series.length > 1 ? (W - P * 2) / (series.length - 1) : 0;
+      const pts = series.map(function(d, i) {
+        const x = P + i * stepX;
+        const y = H - P - (d.count / max) * (H - P * 2);
+        return [x, y];
+      });
+      const line = pts.map(function(p, i){ return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+      const area = line + " L " + pts[pts.length-1][0].toFixed(1) + " " + (H - P) + " L " + pts[0][0].toFixed(1) + " " + (H - P) + " Z";
+      let labels = "";
+      const tickEvery = Math.ceil(series.length / 6);
+      series.forEach(function(d, i) {
+        if (i % tickEvery === 0 || i === series.length - 1) {
+          labels += '<text x="' + (P + i * stepX) + '" y="' + (H - 8) + '" font-size="9" fill="#73685d" text-anchor="middle">' + String(d.date).slice(5) + '</text>';
+        }
+      });
+      let grid = "";
+      for (let g = 0; g <= 2; g++) {
+        const y = P + g * ((H - P * 2) / 2);
+        grid += '<line x1="' + P + '" y1="' + y + '" x2="' + (W - P) + '" y2="' + y + '" stroke="rgba(31,26,20,.08)"/>' +
+                '<text x="' + (P - 6) + '" y="' + (y + 3) + '" font-size="9" fill="#73685d" text-anchor="end">' + Math.round(max - g * (max / 2)) + '</text>';
+      }
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="trend chart">' +
+        '<defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + color + '" stop-opacity=".25"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
+        grid + '<path d="' + area + '" fill="url(#ag)"/><path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+        pts.map(function(p){ return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" fill="' + color + '"/>'; }).join("") + labels + '</svg>';
+    }
+
+    function svgDonut(segments, centerLabel) {
+      // segments: [{label, value, color}]
+      const total = segments.reduce(function(s, x){ return s + x.value; }, 0);
+      if (!total) return '<p class="tiny" style="text-align:center;padding:24px;">No data yet.</p>';
+      let acc = 0;
+      const R = 54, C = 70, SW = 22;
+      const circ = 2 * Math.PI * R;
+      let arcs = "";
+      segments.forEach(function(s) {
+        if (!s.value) return;
+        const frac = s.value / total;
+        const dash = (frac * circ).toFixed(2);
+        const offset = (-acc * circ).toFixed(2);
+        arcs += '<circle cx="' + C + '" cy="' + C + '" r="' + R + '" fill="none" stroke="' + s.color + '" stroke-width="' + SW + '" stroke-dasharray="' + dash + ' ' + (circ - dash).toFixed(2) + '" stroke-dashoffset="' + offset + '" transform="rotate(-90 ' + C + ' ' + C + ')"/>';
+        acc += frac;
+      });
+      const legend = segments.map(function(s) {
+        return '<div class="gatc-legend"><div><i style="background:' + s.color + '"></i>' + s.label + ' <b>' + s.value + '</b></div></div>';
+      }).join("");
+      return '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;"><svg viewBox="0 0 140 140" style="width:140px;height:140px;flex:0 0 auto;">' + arcs + '<text x="70" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#1f3a5f">' + total + '</text><text x="70" y="82" text-anchor="middle" font-size="8" fill="#73685d">' + (centerLabel || "TOTAL") + '</text></svg><div>' + legend + '</div></div>';
+    }
+
+    function svgHBars(items, color) {
+      // items: [[label, value]]
+      if (!items.length) return '<p class="tiny" style="text-align:center;padding:18px;">No data yet.</p>';
+      const max = Math.max(1, Math.max.apply(null, items.map(function(x){ return x[1]; })));
+      return '<div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">' + items.map(function(x) {
+        const pct = Math.round((x[1] / max) * 100);
+        return '<div><div class="row" style="justify-content:space-between;"><span>' + x[0] + '</span><b>' + x[1] + '</b></div><div class="progress"><span style="width:' + pct + '%;background:' + color + '"></span></div></div>';
+      }).join("") + '</div>';
+    }
+
+    const STATUS_COLORS = { pending: "#e0a020", submitted: "#e0a020", approved: "#1a6b45", scheduled: "#2a4d7c", gatc_assigned: "#4a6d9c", inspection_completed: "#1a6b45", payment_pending: "#b8893a", payment_paid: "#2a4d7c", verified: "#1a6b45", rejected: "#9c2b1a", failed: "#9c2b1a" };
+
+    async function adminAnalytics(days) {
+      if (S.user && S.user.role !== "admin") { /* allow officer preview */ }
+      const range = Number(days || (S.payload && S.payload.days) || S.analyticsDays || 30);
+      S.analyticsDays = range;
+      let d;
+      try { d = await api("/api/analytics?days=" + range); }
+      catch (e) { return shell("", '<div class="err">' + (e.message || "Analytics unavailable") + '</div>', "admin"); }
+
+      const tabs = [7, 30, 90, 365].map(function(n) {
+        return '<button class="' + (n === range ? "active" : "") + '" onclick="go(\'admin-analytics\',{days:' + n + '})">' + n + ' days</button>';
+      }).join("");
+
+      const appStatusSegs = Object.keys(d.applications.by_status).map(function(k) {
+        return { label: k.replace(/_/g, " "), value: d.applications.by_status[k], color: STATUS_COLORS[k] || "#a5acb5" };
+      });
+      const greqSegs = ["approved", "pending", "rejected"].map(function(k) {
+        return { label: k, value: (d.gatc_requests.by_status || {})[k] || 0, color: k === "approved" ? "#1a6b45" : k === "pending" ? "#e0a020" : "#9c2b1a" };
+      });
+      const districts = Object.keys(d.instruments.by_district).map(function(k){ return [k, d.instruments.by_district[k]]; }).sort(function(a,b){ return b[1] - a[1]; }).slice(0, 6);
+      const failReasons = Object.keys(d.failed_reasons || {}).map(function(k){ return [k, d.failed_reasons[k]]; }).sort(function(a,b){ return b[1] - a[1]; });
+      const complaintTypes = Object.keys(d.complaints.by_type).map(function(k){ return [k, d.complaints.by_type[k]]; }).sort(function(a,b){ return b[1] - a[1]; }).slice(0, 5);
+      const passRate = d.inspections.total ? Math.round((d.inspections.pass / d.inspections.total) * 100) : 0;
+
+      return shell("", '<p class="crumb">Government Dashboard</p><div class="row" style="justify-content:space-between;align-items:center;"><div><h1>Reports &amp; Analytics</h1><p class="intro" style="margin-bottom:0;">Live metrics across applications, GATC workflow, inspections, certificates and risk — computed from the database.</p></div><div class="range-tabs">' + tabs + '</div></div>' +
+      '<div class="grid-4 mb" style="margin-top:18px;">' +
+        '<div class="card kpi"><b>' + d.applications.total + '</b><span>Total Applications</span></div>' +
+        '<div class="card kpi"><b>' + d.inspections.total + '</b><span>Inspections · ' + passRate + '% pass</span></div>' +
+        '<div class="card kpi"><b>' + d.gatc_requests.total + '</b><span>GATC Requests</span></div>' +
+        '<div class="card kpi"><b>₹' + Number(d.payments.amount || 0).toLocaleString("en-IN") + '</b><span>Fees Collected · ' + d.payments.total + ' payments</span></div>' +
+      '</div>' +
+      '<div class="grid-2 mb"><div class="card chart-card"><h3>Applications per day <span class="tiny" style="font-weight:400;">(last ' + d.days + ' days)</span></h3>' + svgLineChart(d.applications.per_day, "#e07020") + '</div>' +
+      '<div class="card chart-card"><h3>Applications by status</h3>' + svgDonut(appStatusSegs, "APPLICATIONS") + '</div></div>' +
+      '<div class="grid-2 mb"><div class="card chart-card"><h3>Inspection outcomes</h3>' + svgDonut([{label:"Passed", value:d.inspections.pass, color:"#1a6b45"},{label:"Failed", value:d.inspections.fail, color:"#9c2b1a"}], "INSPECTIONS") + '</div>' +
+      '<div class="card chart-card"><h3>Instruments by district</h3>' + svgHBars(districts, "#1f3a5f") + '</div></div>' +
+      '<div class="grid-2 mb"><div class="card chart-card"><h3>MO → GATC request outcomes</h3>' + svgDonut(greqSegs, "REQUESTS") + '</div>' +
+      '<div class="card chart-card"><h3>Failed cases by reason</h3>' + svgHBars(failReasons, "#9c2b1a") + '</div></div>' +
+      '<div class="grid-2"><div class="card chart-card"><h3>Complaints by type</h3>' + svgHBars(complaintTypes, "#b8893a") + '</div>' +
+      '<div class="card"><h3>Registry snapshot</h3><table class="table mt"><tr><th>Registered instruments</th><td><b>' + d.instruments.total + '</b></td></tr><tr><th>High-risk instruments</th><td><b style="color:var(--danger);">' + d.instruments.high_risk + '</b></td></tr><tr><th>Certificates</th><td>' + Object.keys(d.certificates.by_status).map(function(k){ return '<span class="tiny mono">' + k + ': ' + d.certificates.by_status[k] + '</span>'; }).join(" · ") + '</td></tr><tr><th>GATC centres</th><td><b>' + d.gatcs.total + '</b> (' + d.gatcs.active + ' active)</td></tr><tr><th>Authorizations</th><td>' + (Object.keys(d.authorizations.by_status).map(function(k){ return '<span class="tiny mono">' + k.replace(/_/g," ") + ': ' + d.authorizations.by_status[k] + '</span>'; }).join(" · ") || '—') + '</td></tr></table></div></div>', "admin");
     }
 
     async function adminMap() {
@@ -1515,12 +2141,21 @@
       const instOptions = DB.instruments.map(function(i) {
         return '<option value="' + i.id + '">' + i.serial + ' — ' + i.name + '</option>';
       }).join("");
-      return shell("", '<p class="crumb">Owner / Trader Portal · Verification</p><h1>Apply for Instrument Verification</h1><p class="intro">Submit your instrument for Legal Metrology verification. Your application will remain <b>Pending</b> until a Metrology Officer reviews and approves it. Only after approval will a verification date and time be scheduled.</p><div class="card" style="max-width:760px;"><div class="field"><label>Instrument</label><select id="verify-instrument">' + instOptions + '</select></div><div class="grid-2"><div class="field"><label>Owner / Trader Name</label><input id="verify-owner" value="' + (S.user.name || "") + '" /></div><div class="field"><label>Business / Establishment</label><input id="verify-org" value="' + (S.user.org || "") + '" /></div></div><div class="grid-2"><div class="field"><label>Contact Number</label><input id="verify-phone" placeholder="10-digit mobile number" /></div><div class="field"><label>Preferred Date (Optional)</label><input id="verify-preferred-date" type="date" /></div></div><div class="field"><label>Additional Information</label><textarea id="verify-notes" rows="4" placeholder="Any details the officer should know about the instrument..."></textarea></div><button class="btn btn-saffron btn-full" onclick="submitVerificationApplication()">Submit Verification Application</button><div id="verify-apply-out" class="mt"></div></div>', "user");
+      let resubmitBanner = "";
+      let preset = null;
+      if (S.payload && S.payload.resubmit_of) {
+        preset = DB.applications.find(function(x){ return x.id === S.payload.resubmit_of; });
+        if (preset) {
+          resubmitBanner = '<div class="reason-box" style="margin-bottom:16px;"><b>Resubmitting after rejection</b>' + (preset.rejection_reason || "No reason recorded.") + '<div class="tiny" style="margin-top:6px;color:inherit;">Correct the details below and submit again. A fresh application (' + chip("pending") + ') will replace the rejected one in the officer queue.</div></div>';
+        }
+      }
+      return shell("", '<p class="crumb">Owner / Trader Portal · Verification</p><h1>Apply for Instrument Verification</h1><p class="intro">Submit your instrument for Legal Metrology verification. Your application will remain <b>Pending</b> until a Metrology Officer reviews and approves it. Only after approval will a verification date and time be scheduled.</p>' + resubmitBanner + '<div class="card" style="max-width:760px;"><div class="field"><label>Instrument</label><select id="verify-instrument"' + (preset ? ' disabled' : '') + '>' + instOptions + '</select></div><div class="grid-2"><div class="field"><label>Owner / Trader Name</label><input id="verify-owner" value="' + (S.user.name || "") + '" /></div><div class="field"><label>Business / Establishment</label><input id="verify-org" value="' + (S.user.org || "") + '" /></div></div><div class="grid-2"><div class="field"><label>Contact Number</label><input id="verify-phone" placeholder="10-digit mobile number" value="' + ((preset && preset.phone) || "") + '" /></div><div class="field"><label>Preferred Date (Optional)</label><input id="verify-preferred-date" type="date" /></div></div><div class="field"><label>Additional Information</label><textarea id="verify-notes" rows="4" placeholder="Any details the officer should know about the instrument...">' + ((preset && preset.notes) || "") + '</textarea></div><button class="btn btn-saffron btn-full" onclick="submitVerificationApplication()">Submit Verification Application</button><div id="verify-apply-out" class="mt"></div></div>', "user");
     }
 
     function submitVerificationApplication() {
       const instId = parseInt($("#verify-instrument") ? $("#verify-instrument").value : "1");
-      const inst = DB.instruments.find(function(i) { return i.id === instId; }) || DB.instruments[0];
+      const preset = (S.payload && S.payload.resubmit_of) ? DB.applications.find(function(x){ return x.id === S.payload.resubmit_of; }) : null;
+      const inst = DB.instruments.find(function(i) { return i.id === instId; }) || (preset ? DB.instruments.find(function(i){return i.id === preset.instrument_id;}) : null) || DB.instruments[0];
       const owner = $("#verify-owner") ? $("#verify-owner").value.trim() : "";
       const org = $("#verify-org") ? $("#verify-org").value.trim() : "";
       if (!owner || !org) {
@@ -1549,14 +2184,17 @@
         district: S.user.district || inst.district,
         submitted_date: new Date().toISOString().slice(0, 10),
         assigned_officer: "Unassigned",
-        schedule: null
+        assignment_status: "unassigned",
+        schedule: null,
+        resubmit_of: preset ? preset.public_id : undefined
       };
+      if (preset) preset.resubmitted = true;
       DB.applications.unshift(appItem);
       saveVerificationWorkflow();
-      addNotification("officer", "New Verification Application", appItem.applicant_name + " submitted " + appItem.public_id + " for " + appItem.serial + ".", "🔔", "officer-queue");
+      addNotification("officer", appItem.resubmit_of ? "Application Resubmitted" : "New Verification Application", appItem.applicant_name + " submitted " + appItem.public_id + " for " + appItem.serial + "." + (appItem.resubmit_of ? " (Resubmitted after rejection of " + appItem.resubmit_of + ")" : ""), "🔔", "officer-queue");
       addNotification("user", "Application Submitted", "Your " + appItem.public_id + " is pending officer review.", "📨", "verification-applications");
       $("#verify-apply-out").innerHTML = '<div class="card" style="background:#e4f2ea;color:var(--green-d);"><b>Application submitted successfully.</b><br>Application ID: <span class="mono">' + appItem.public_id + '</span><br>Status: ' + chip("pending") + '<p class="tiny" style="color:inherit;margin-top:8px;">A Metrology Officer will review your request. The schedule will appear here only after approval.</p></div>';
-      setTimeout(function() { go("verification-applications"); }, 1200);
+      setTimeout(function() { S.payload = {}; go("verification-applications"); }, 1200);
     }
 
     async function verificationApplicationsView() {
@@ -1568,30 +2206,52 @@
       } else {
         apps.forEach(function(a) {
           const scheduleHtml = a.schedule ? '<div class="card" style="background:#e4f2ea;margin-top:12px;"><h3 style="color:var(--green-d);">Verification Schedule</h3><div class="grid-2"><div><span class="tiny">DATE</span><br><b class="mono">' + a.schedule.date + '</b></div><div><span class="tiny">TIME</span><br><b class="mono">' + a.schedule.time + '</b></div></div><p class="tiny" style="margin-top:10px;color:var(--green-d);">Officer: <b>' + a.schedule.officer + '</b><br>Location: ' + (a.schedule.location || a.org) + '</p></div>' : '';
-          cards += '<div class="card mb"><div class="row"><div><span class="tiny">APPLICATION ID</span><h3 class="mono" style="margin:4px 0;">' + a.public_id + '</h3></div><div>' + chip(a.status) + '</div></div><div class="grid-2" style="margin-top:14px;"><div><span class="tiny">INSTRUMENT</span><br><b>' + a.instrument_name + '</b><div class="mono tiny">' + a.serial + '</div></div><div><span class="tiny">SUBMITTED</span><br><b class="mono">' + a.submitted_date + '</b><div class="tiny">' + a.org + '</div></div></div>' + verificationTimeline(a) + scheduleHtml + '</div>';
+          let rejectHtml = "";
+          if (a.status === "rejected") {
+            rejectHtml = '<div class="reason-box"><b>Rejected' + (a.rejected_by ? ' by ' + a.rejected_by : '') + '</b>' + (a.rejection_reason || "No reason recorded.") + '</div><button class="btn btn-saffron mt" onclick="resubmitApplication(' + a.id + ')">Update &amp; Resubmit Application</button>';
+          }
+          let failHtml = "";
+          if (a.status === "failed") {
+            failHtml = '<div class="reason-box"><b>Verification failed</b>' + (a.failure_reason_label || reasonLabel("failure", a.failure_reason_code) || "The instrument did not pass verification.") + (a.failure_note ? '<div class="tiny" style="margin-top:4px;">' + a.failure_note + '</div>' : '') + '</div>';
+          }
+          cards += '<div class="card mb"><div class="row"><div><span class="tiny">APPLICATION ID</span><h3 class="mono" style="margin:4px 0;">' + a.public_id + '</h3></div><div>' + chip(a.status) + '</div></div><div class="grid-2" style="margin-top:14px;"><div><span class="tiny">INSTRUMENT</span><br><b>' + a.instrument_name + '</b><div class="mono tiny">' + a.serial + '</div></div><div><span class="tiny">SUBMITTED</span><br><b class="mono">' + a.submitted_date + '</b><div class="tiny">' + a.org + '</div></div></div>' + verificationTimeline(a) + scheduleHtml + rejectHtml + failHtml + '</div>';
         });
       }
       return shell("", '<p class="crumb">Owner / Trader Portal · Applications</p><div class="row"><h1>My Verification Applications</h1><button class="btn btn-saffron right" onclick="go(\'verification-apply\')">+ New Application</button></div><p class="intro">Track approval, instrument testing, and payment status.</p>' + cards, "user");
     }
 
+    function officerAssignedApps() {
+      // Applications assigned to this officer (via admin assignment) plus open unassigned requests.
+      const myId = S.user ? S.user.id : -1;
+      return DB.applications.filter(function(a) {
+        const assignedToMe = Number(a.officer_id) === Number(myId);
+        const unassigned = !a.assigned_officer || a.assigned_officer === "Unassigned";
+        return a.workflow === "verification" && (assignedToMe || (unassigned && ["pending","submitted"].indexOf(a.status) !== -1));
+      });
+    }
+
     async function officerQueue() {
-      const apps = DB.applications.filter(function(a) { return a.workflow === "verification"; });
+      const apps = officerAssignedApps();
       let rows = "";
       apps.forEach(function(a) {
+        const mine = Number(a.officer_id) === Number(S.user ? S.user.id : -1);
+        const assignChip = a.assigned_officer && a.assigned_officer !== "Unassigned" ? (mine ? ' <span class="chip info">Assigned to me</span>' : ' <span class="chip muted">Assigned: ' + a.assigned_officer + '</span>') : ' <span class="chip warn">Unassigned</span>';
         let action = '';
-        if (a.status === "pending") action = '<button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-review\',{aid:' + a.id + '})">Review</button>';
+        if (a.status === "pending" || a.status === "submitted") action = '<button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-review\',{aid:' + a.id + '})">Review</button>';
         else if (a.status === "approved") action = '<button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-schedule\',{aid:' + a.id + '})">Schedule</button>';
-        else if (a.status === "scheduled") action = '<span class="tiny">Schedule confirmed</span>';
+        else if (a.status === "scheduled" || a.status === "gatc_assigned") action = '<span class="tiny">Schedule confirmed</span>';
+        else if (a.status === "inspection_completed") action = '<button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-inspect\',{aid:' + a.id + '})">View Inspection</button>';
         else if (a.status === "payment_paid") action = '<span class="tiny ok-text">Payment received</span>';
         else if (a.status === "payment_pending") action = '<span class="tiny">Awaiting payment</span>';
+        else if (a.status === "failed") action = '<span class="tiny bad-text">Failed · ' + (a.failure_reason_label || reasonLabel("failure", a.failure_reason_code) || "see file") + '</span>';
         else action = '<span class="tiny">No action</span>';
-        rows += '<tr><td class="mono"><b>' + a.public_id + '</b></td><td><b>' + a.applicant_name + '</b><div class="tiny">' + a.org + '</div></td><td><span class="mono">' + a.serial + '</span><div class="tiny">' + a.instrument_name + '</div></td><td class="mono">' + a.submitted_date + '</td><td>' + chip(a.status) + '</td><td>' + action + '</td></tr>';
+        rows += '<tr><td class="mono"><b>' + a.public_id + '</b></td><td><b>' + a.applicant_name + '</b><div class="tiny">' + a.org + '</div></td><td><span class="mono">' + a.serial + '</span><div class="tiny">' + a.instrument_name + '</div></td><td class="mono">' + a.submitted_date + '</td><td>' + chip(a.status) + assignChip + '</td><td>' + action + '</td></tr>';
       });
-      if (!rows) rows = '<tr><td colspan="6" style="text-align:center;padding:30px;">No owner/trader verification applications yet.</td></tr>';
-      const pending = apps.filter(function(a){return a.status === "pending";}).length;
+      if (!rows) rows = '<tr><td colspan="6" style="text-align:center;padding:30px;">No applications assigned to you yet. The admin assigns applications from the Admin → Applications page.</td></tr>';
+      const pending = apps.filter(function(a){return a.status === "pending" || a.status === "submitted";}).length;
       const approved = apps.filter(function(a){return a.status === "approved";}).length;
-      const scheduled = apps.filter(function(a){return a.status === "scheduled";}).length;
-      return shell("", '<p class="crumb">Metrology Officer Portal · Verification Applications</p><h1>Verification Application Queue</h1><p class="intro">Review owner/trader requests. Approve valid applications first; only approved applications can be scheduled.</p><div class="grid-3 mb">' + kpi(pending,"Pending Review") + kpi(approved,"Approved · Awaiting Schedule") + kpi(scheduled,"Scheduled") + '</div><div class="card"><table class="table"><thead><tr><th>Application</th><th>Owner / Trader</th><th>Instrument</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>', "officer");
+      const scheduled = apps.filter(function(a){return a.status === "scheduled" || a.status === "gatc_assigned";}).length;
+      return shell("", '<p class="crumb">Metrology Officer Portal · Verification Applications</p><h1>Verification Application Queue</h1><p class="intro">Review owner/trader requests assigned to you. Approve valid applications first; only approved applications can be scheduled.</p><div class="grid-3 mb">' + kpi(pending,"Pending Review") + kpi(approved,"Approved · Awaiting Schedule") + kpi(scheduled,"Scheduled / GATC") + '</div><div class="card"><table class="table"><thead><tr><th>Application</th><th>Owner / Trader</th><th>Instrument</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>', "officer");
     }
 
     async function officerReview() {
@@ -1608,26 +2268,119 @@
       a.status = "approved";
       a.approved_by = S.user ? S.user.name : "Metrology Officer";
       a.approved_at = new Date().toISOString().slice(0, 16).replace("T", " ");
+      if (S.user) { a.officer_id = S.user.id; }
       a.assigned_officer = S.user ? (S.user.name + " (" + (S.user.lmo_code || "LMO") + ")") : "Metrology Officer";
+      a.assignment_status = "assigned";
       saveVerificationWorkflow();
       addNotification("user", "Application Approved", a.public_id + " has been approved. Verification can now be scheduled.", "✅", "verification-applications");
       addNotification("admin", "Application Approved", a.public_id + " was approved by the Metrology Officer.", "✅", "admin-applications");
-      alert("Application " + a.public_id + " approved. Now schedule the verification date and time.");
+      toast("Application " + a.public_id + " approved. Now schedule the verification date and time.", "ok");
       go("officer-schedule", {aid: aid});
     }
 
-    function rejectVerificationApplication(aid) {
+    async function rejectVerificationApplication(aid) {
       const a = DB.applications.find(function(x) { return x.id === aid && x.workflow === "verification"; });
       if (!a) return;
-      const reason = prompt("Reason for rejection:", "Instrument or applicant details require correction.");
-      if (reason === null) return;
+      const res = await confirmDialog({
+        title: "Reject this application?",
+        message: "Application <b class='mono'>" + a.public_id + "</b> from " + a.applicant_name + " will be <b>Rejected</b> and sent back to the applicant with your reason.",
+        confirmText: "Reject Application",
+        danger: true,
+        requireReason: { family: "application_rejection", label: "Reason for rejection", required: true }
+      });
+      if (!res.ok) return;
       a.status = "rejected";
-      a.rejection_reason = reason || "Application details require correction.";
+      a.rejection_reason = reasonLabel("gatc_rejection", res.reasonCode) + (res.reasonNote ? " — " + res.reasonNote : "");
+      a.rejection_reason_code = res.reasonCode;
       a.rejected_by = S.user ? S.user.name : "Metrology Officer";
       saveVerificationWorkflow();
       addNotification("user", "Application Rejected", a.public_id + " was rejected. Reason: " + a.rejection_reason, "❌", "verification-applications");
-      alert("Application " + a.public_id + " rejected.");
+      toast("Application " + a.public_id + " rejected — the applicant will see your reason.", "warn");
       go("officer-queue");
+    }
+
+    // ---------------- High-risk + Outside jurisdiction ----------------
+    function highRiskCases() {
+      const cases = [];
+      (DB.instruments || []).forEach(function(i) {
+        const risky = i.high_risk || i.status === "expired" || i.oem_status === "third_party" || i.status === "sealed_tampered";
+        if (!risky) return;
+        const reasons = [];
+        if (i.oem_status === "third_party") reasons.push(reasonLabel("failure", "third_party_issue"));
+        if (i.status === "sealed_tampered") reasons.push(reasonLabel("failure", "tampered_seal"));
+        if (i.status === "expired") reasons.push(reasonLabel("failure", "overdue_verification"));
+        if (i.risk_reason) reasons.push(i.risk_reason);
+        cases.push({ type: "Instrument", ref: i.serial, label: i.name, user_id: i.premises || "—", location: (i.district || "—") + (i.premises ? " · " + i.premises : ""), group_id: "INST-" + i.id, reasons: reasons, district: i.district, entity: { type: "instrument", id: i.id, label: i.serial } });
+      });
+      (DB.inspections || []).forEach(function(x) {
+        if (x.verdict !== "fail") return;
+        cases.push({ type: "Failed inspection", ref: x.code, label: x.instrument_name, user_id: x.officer_name + " (" + (x.officer_code || "") + ")", location: x.district || "—", group_id: "INS-" + x.id, reasons: [x.failure_reason_label || reasonLabel("failure", x.failure_reason_code) || "Verification failure"], district: x.district, entity: { type: "application", id: x.application_id, label: x.public_id || x.serial } });
+      });
+      (DB.complaints || []).forEach(function(c) {
+        if (String(c.priority || "").toLowerCase() !== "high") return;
+        cases.push({ type: "High-priority complaint", ref: c.id, label: c.type, user_id: "Complainant · " + (c.serial || c.instrument_id), location: c.district || "—", group_id: "CMP-" + c.id, reasons: [c.description || c.type], district: c.district, entity: { type: "complaint", id: c.id, label: c.id } });
+      });
+      return cases;
+    }
+
+    async function officerHighRiskView() {
+      if (!S.user || (S.user.role !== "officer" && S.user.role !== "admin")) return go("login-unified");
+      const myDistrict = S.user.district || "";
+      const cases = highRiskCases();
+      const inJurisdiction = cases.filter(function(c){ return String(c.district || "").toLowerCase() === String(myDistrict).toLowerCase() || !c.district; });
+      const outside = cases.filter(function(c){ return c.district && String(c.district).toLowerCase() !== String(myDistrict).toLowerCase(); });
+      const myAuths = (DB.authorizations || []).filter(function(a){ return Number(a.officer_id) === Number(S.user ? S.user.id : -1); });
+
+      function caseRow(c, isOutside) {
+        const already = myAuths.find(function(a){ return String(a.entity_id) === String(c.entity.id) && a.entity_type === c.entity.type && a.status === "authorization_requested"; });
+        const authed = myAuths.find(function(a){ return String(a.entity_id) === String(c.entity.id) && a.entity_type === c.entity.type && a.status === "authorized"; });
+        let action = '<span class="tiny">—</span>';
+        if (isOutside) {
+          if (authed) action = '<span class="chip ok">Authorized</span>';
+          else if (already) action = '<span class="chip warn">Authorization Requested</span>';
+          else action = '<button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="requestAuthorization(\'' + c.entity.type + '\',\'' + String(c.entity.id).replace(/'/g,"") + '\',\'' + String(c.district || "").replace(/'/g,"") + '\',\'' + String(c.group_id).replace(/'/g,"") + '\')">Request Authorizing</button>';
+        }
+        return '<tr><td><span class="chip ' + (isOutside ? "warn" : "bad") + '">' + (isOutside ? "OUTSIDE JURISDICTION" : "HIGH RISK") + '</span><div class="tiny mt">' + c.type + '</div></td>' +
+          '<td class="mono"><b>' + c.ref + '</b><div class="tiny">' + c.label + '</div></td>' +
+          '<td class="mono tiny">' + c.user_id + '</td>' +
+          '<td>' + c.location + '<div class="tiny">Group: <span class="mono">' + c.group_id + '</span></div></td>' +
+          '<td style="max-width:230px;"><ul style="margin:0;padding-left:16px;font-size:12px;color:var(--danger);">' + c.reasons.map(function(r){ return '<li>' + r + '</li>'; }).join("") + '</ul></td>' +
+          '<td>' + action + '</td></tr>';
+      }
+      const outsideRows = outside.map(function(c){ return caseRow(c, true); }).join("") || '<tr><td colspan="6" class="tiny" style="text-align:center;padding:24px;">No cases outside your jurisdiction.</td></tr>';
+      const insideRows = inJurisdiction.map(function(c){ return caseRow(c, false); }).join("") || '<tr><td colspan="6" class="tiny" style="text-align:center;padding:24px;">No high-risk cases in your jurisdiction.</td></tr>';
+
+      let authRows = "";
+      myAuths.forEach(function(a) {
+        authRows += '<tr><td class="mono"><b>' + a.code + '</b><div class="tiny">' + a.created_on + '</div></td><td>' + a.entity_type + ' <span class="mono tiny">' + a.entity_id + '</span></td><td>' + (a.location || a.district || "—") + '<div class="tiny">' + (a.group_id ? "Group: " + a.group_id : "") + '</div></td><td>' + (a.reason_label || reasonLabel("authorization", a.reason_code)) + (a.reason_note ? '<div class="tiny">' + a.reason_note + '</div>' : '') + '</td><td>' + chip(a.status) + '</td><td class="tiny">' + (a.decided_by ? a.decided_by + '<br>' + a.decided_on + (a.decision_note ? '<br>“' + a.decision_note + '”' : '') : 'Awaiting admin decision') + '</td></tr>';
+      });
+      if (!authRows) authRows = '<tr><td colspan="6" class="tiny" style="text-align:center;padding:24px;">No authorization requests yet.</td></tr>';
+
+      return shell("", '<p class="crumb">Metrology Officer · Priority Queue</p><h1>High-Risk &amp; Outside Jurisdiction</h1><p class="intro">Priority and failed cases are listed here. Cases located outside <b>' + (myDistrict || "your district") + '</b> are marked <b>Outside Jurisdiction</b> — request authorization to handle them.</p>' +
+      '<div class="card mb"><h3>⭯ Outside Jurisdiction Cases</h3><p class="tiny mb">These belong to another district. Use <b>Request Authorizing</b> — an admin must approve before you can act on the case.</p><div style="overflow-x:auto;"><table class="table"><thead><tr><th>Flag</th><th>Case</th><th>User ID / Owner</th><th>Location · Group ID</th><th>Reason</th><th>Action</th></tr></thead><tbody>' + outsideRows + '</tbody></table></div></div>' +
+      '<div class="card mb"><h3>⚠ High-Risk Cases in ' + (myDistrict || "Your District") + '</h3><div style="overflow-x:auto;"><table class="table"><thead><tr><th>Flag</th><th>Case</th><th>User ID / Owner</th><th>Location · Group ID</th><th>Reason</th><th>Action</th></tr></thead><tbody>' + insideRows + '</tbody></table></div></div>' +
+      '<div class="card"><h3>My Authorization Requests</h3><div style="overflow-x:auto;"><table class="table"><thead><tr><th>Request</th><th>Entity</th><th>Location</th><th>Reason</th><th>Status</th><th>Admin Decision</th></tr></thead><tbody>' + authRows + '</tbody></table></div></div>', "officer");
+    }
+
+    async function requestAuthorization(entityType, entityId, district, groupId) {
+      const res = await confirmDialog({
+        title: "Request authorization?",
+        message: "This case is <b>Outside Jurisdiction</b> (district: <b>" + (district || "unknown") + "</b>). An authorization request will be sent to the Admin. You should not act on this case until it is approved.",
+        confirmText: "Request Authorizing",
+        danger: false,
+        requireReason: { family: "authorization", label: "Reason for authorization", required: true }
+      });
+      if (!res.ok) return;
+      try {
+        const r = await api("/api/authorizations", { method: "POST", body: { entity_type: entityType, entity_id: entityId, district: district, location: district, group_id: groupId, reason_code: res.reasonCode, reason_note: res.reasonNote, user_label: "" } });
+        DB.authorizations.unshift(r.authorization);
+        addNotification("admin", "Authorization Requested", r.authorization.code + " — " + r.authorization.reason_label, "🛂", "admin-risk");
+        toast("Authorization request " + r.authorization.code + " submitted.", "ok");
+        await refreshBootstrap();
+        go("officer-highrisk");
+      } catch (e) {
+        toast(e.message || "Could not submit authorization request", "error");
+      }
     }
 
     async function officerSchedule() {
@@ -1659,23 +2412,243 @@
       setTimeout(function() { go("officer-queue"); }, 1400);
     }
 
-    async function officerHome() {
-      let queueRows = "";
-      DB.applications.forEach(function(a) {
-        queueRows += '<tr><td class="mono">' + a.public_id + '</td><td class="mono">' + a.serial + '</td><td>' + a.org + '</td><td>' + chip(a.status) + '</td><td><button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-inspect\', {iid:' + a.instrument_id + '})">Start Field Test</button></td></tr>';
+    // ---------------- MO → GATC requests ----------------
+    function myGatcRequests() {
+      const myId = S.user ? S.user.id : -1;
+      return (DB.gatc_requests || []).filter(function(r){ return Number(r.officer_id) === Number(myId); })
+        .sort(function(a,b){ return String(b.created_on || "").localeCompare(String(a.created_on || "")); });
+    }
+
+    async function officerGatcView() {
+      if (!S.user || (S.user.role !== "officer" && S.user.role !== "admin")) return go("login-unified");
+      const reqs = myGatcRequests();
+      const pending = reqs.filter(function(r){ return r.status === "pending"; }).length;
+      const rejected = reqs.filter(function(r){ return r.status === "rejected"; }).length;
+      const approved = reqs.filter(function(r){ return r.status === "approved"; }).length;
+      let rows = "";
+      reqs.forEach(function(r) {
+        let statusCol = chip(r.status === "pending" ? "under_review" : r.status);
+        let reasonCol = '<span class="tiny">—</span>';
+        if (r.status === "rejected") {
+          reasonCol = '<div class="reason-box" style="margin-top:0;"><b>' + (r.reason_label || reasonLabel("gatc_rejection", r.reason_code)) + '</b>' + (r.reason_note ? r.reason_note : '') + '</div>';
+        } else if (r.status === "approved") {
+          reasonCol = '<span class="tiny ok-text">Approved by ' + (r.gatc_code || "GATC") + ' · ' + (r.decided_on || "") + '</span>';
+        }
+        let action = '<span class="tiny">—</span>';
+        if (r.status === "rejected") {
+          action = '<button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="prefillGatcRequest(' + (r.application_id || "null") + ')">Resend Request</button>';
+        } else if (r.status === "pending") {
+          action = '<span class="tiny warn-text">Awaiting GATC decision</span>';
+        }
+        rows += '<tr><td class="mono"><b>' + r.code + '</b><div class="tiny">' + (r.created_on || "") + '</div></td>' +
+          '<td>' + (r.public_id ? '<span class="mono">' + r.public_id + '</span><div class="tiny">' + (r.application_id || "") + '</div>' : '<span class="tiny">Direct instrument request</span>') + '</td>' +
+          '<td><span class="mono">' + r.serial + '</span><div class="tiny">' + r.instrument_name + '</div></td>' +
+          '<td>' + (r.gatc_code || 'Any eligible GATC') + '<div class="tiny">' + (r.message || "") + '</div></td>' +
+          '<td>' + statusCol + '</td><td style="max-width:220px;">' + reasonCol + '</td><td>' + action + '</td></tr>';
       });
-      return shell("", '<p class="crumb">Officer Portal · ' + (S.user?.lmo_code || "LMO-01") + '</p><h1>Inspector Field Desk</h1><p class="intro">Conduct OIML R 76 increasing-load verification tests and record digitally signed inspection results.</p><div class="grid-3 mb">' + kpi(6, "Assigned Inspections") + kpi(18, "Completed This Month") + kpi(1, "Overdue") + '</div><div class="card mb"><h3>Owner / Trader Verification Requests</h3><p class="tiny">Approve applications before assigning a date and time.</p><button class="btn btn-saffron mt" onclick="go(\'officer-queue\')">Open Verification Queue</button></div><div class="card"><h3>My Inspection Queue</h3><table class="table"><thead><tr><th>Application</th><th>Instrument</th><th>Establishment</th><th>Status</th><th>Action</th></tr></thead><tbody>' + queueRows + '</tbody></table></div>', "officer");
+      if (!rows) rows = '<tr><td colspan="7" style="text-align:center;padding:30px;">No GATC requests sent yet. Use <b>Send Request to GATC</b> to ask a Government Approved Test Centre to test an instrument.</td></tr>';
+      return shell("", '<p class="crumb">Metrology Officer · GATC Workflow</p><div class="row"><div><h1>GATC Requests</h1><p class="intro">Send testing requests to Government Approved Test Centres (GATC). Track each request as Pending → Approved / Rejected. If rejected, the GATC\'s reason is shown and you can resend the request.</p></div><button class="btn btn-saffron right" onclick="prefillGatcRequest(null)">➢ Send Request to GATC</button></div>' +
+      '<div class="grid-4 mb">' + kpi(reqs.length, "Total Requests") + kpi(pending, "Pending") + kpi(approved, "Approved") + kpi(rejected, "Rejected") + '</div>' +
+      '<div class="card" style="overflow-x:auto;"><table class="table"><thead><tr><th>Request</th><th>Application</th><th>Instrument</th><th>GATC / Message</th><th>Status</th><th>Rejection Reason</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>', "officer");
+    }
+
+    function prefillGatcRequest(applicationId) {
+      const existing = document.getElementById("gatc-request-modal"); if (existing) existing.remove();
+      const myApps = officerAssignedApps().filter(function(a){ return ["approved","scheduled","gatc_assigned","inspection_completed","payment_pending","payment_paid","verified"].indexOf(a.status) !== -1 || a.status === "pending"; });
+      let appOptions = '<option value="">— Not linked to an application —</option>' + myApps.map(function(a){ return '<option value="' + a.id + '"' + (Number(applicationId) === Number(a.id) ? ' selected' : '') + '>' + a.public_id + ' — ' + a.serial + '</option>'; }).join("");
+      const gatcOptions = (DB.gatcs || []).map(function(g){ return '<option value="' + g.id + '">' + g.code + ' — ' + g.name + ' (' + g.district + ')</option>'; }).join("");
+      const wrap = document.createElement("div");
+      wrap.id = "gatc-request-modal";
+      wrap.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.58);display:grid;place-items:center;z-index:10001;padding:18px;";
+      wrap.innerHTML = '<div class="card" style="width:100%;max-width:560px;background:#fff;margin:0;"><h3>Send Request to GATC</h3><p class="tiny mb">The request will appear in the selected GATC\'s inbox. They will approve it or reject it with a reason.</p>' +
+        '<div class="field"><label>Application (optional)</label><select id="gr-app">' + appOptions + '</select></div>' +
+        '<div class="field"><label>Instrument</label><select id="gr-inst">' + DB.instruments.map(function(i){ return '<option value="' + i.id + '">' + i.serial + ' — ' + i.name + '</option>'; }).join("") + '</select></div>' +
+        '<div class="field"><label>Target GATC</label><select id="gr-gatc">' + gatcOptions + '</select></div>' +
+        '<div class="field"><label>Subject</label><input id="gr-subject" value="GATC testing request" /></div>' +
+        '<div class="field"><label>Message to GATC *</label><textarea id="gr-message" rows="3" placeholder="Explain what needs to be tested and why..."></textarea></div>' +
+        '<div class="row" style="justify-content:flex-end;"><button class="btn btn-ghost" onclick="document.getElementById(\'gatc-request-modal\').remove()">Cancel</button><button class="btn btn-saffron" id="gr-send">Send Request</button></div><div id="gr-out" class="mt"></div></div>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", function(e){ if (e.target === wrap) wrap.remove(); });
+      wrap.querySelector("#gr-send").onclick = async function() {
+        const appId = wrap.querySelector("#gr-app").value;
+        const instId = wrap.querySelector("#gr-inst").value;
+        const gatcId = wrap.querySelector("#gr-gatc").value;
+        const subject = wrap.querySelector("#gr-subject").value.trim();
+        const message = wrap.querySelector("#gr-message").value.trim();
+        const outEl = wrap.querySelector("#gr-out");
+        if (!message) { outEl.innerHTML = '<div class="err">Please write a short message describing the request.</div>'; return; }
+        if (!appId && !instId) { outEl.innerHTML = '<div class="err">Select an application or an instrument.</div>'; return; }
+        try {
+          const body = { gatc_id: Number(gatcId) || null, subject: subject, message: message };
+          if (appId) body.application_id = Number(appId); else body.instrument_id = Number(instId);
+          const r = await api("/api/gatc-requests", { method: "POST", body: body });
+          wrap.remove();
+          DB.gatc_requests.unshift(r.request);
+          addNotification("gatc", "New MO Request", r.request.code + " from " + r.request.officer_name + " — " + r.request.serial, "📥", "gatc-inbox");
+          toast("Request " + r.request.code + " sent to " + (r.request.gatc_code || "GATC") + ".", "ok");
+          await refreshBootstrap();
+          go("officer-gatc");
+        } catch (e) {
+          outEl.innerHTML = '<div class="err">' + (e.message || "Could not send request") + '</div>';
+        }
+      };
+    }
+
+    async function officerHome() {
+      const myApps = officerAssignedApps();
+      const myInspections = (DB.inspections || []).filter(function(i){ return Number(i.officer_id) === Number(S.user ? S.user.id : -1); });
+      const pendingReview = myApps.filter(function(a){ return a.status === "pending" || a.status === "submitted"; }).length;
+      const pendingInspection = myApps.filter(function(a){ return ["scheduled","gatc_assigned"].indexOf(a.status) !== -1; }).length;
+      const highRisk = myApps.filter(function(a){ return a.high_risk || a.status === "failed"; }).length;
+      const myReqs = (DB.gatc_requests || []).filter(function(r){ return Number(r.officer_id) === Number(S.user ? S.user.id : -1); });
+      const reqsPending = myReqs.filter(function(r){ return r.status === "pending"; }).length;
+      const reqsRejected = myReqs.filter(function(r){ return r.status === "rejected"; }).length;
+      let queueRows = "";
+      myApps.slice(0, 6).forEach(function(a) {
+        queueRows += '<tr><td class="mono">' + a.public_id + '</td><td class="mono">' + a.serial + '</td><td>' + a.org + '</td><td>' + chip(a.status) + '</td><td>' + (a.status === "pending" || a.status === "submitted" ? '<button class="btn btn-saffron" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-review\',{aid:' + a.id + '})">Review</button>' : (["scheduled","gatc_assigned","approved"].indexOf(a.status) !== -1 ? '<button class="btn btn-navy" style="padding:6px 12px;font-size:12px;" onclick="go(\'officer-inspect\',{aid:' + a.id + '})">Field Inspection</button>' : '<span class="tiny">—</span>')) + '</td></tr>';
+      });
+      if (!queueRows) queueRows = '<tr><td colspan="5" class="tiny" style="text-align:center;padding:24px;">No applications assigned to you yet.</td></tr>';
+      return shell("", '<p class="crumb">Officer Portal · ' + (S.user?.lmo_code || "LMO-01") + '</p><h1>Inspector Field Desk</h1><p class="intro">Review verification applications, conduct field inspections with measurements, photos and GPS, and manage GATC testing requests.</p>' +
+        '<div class="grid-4 mb">' + kpi(myApps.length, "Assigned Applications") + kpi(pendingReview, "Pending Review") + kpi(myInspections.length, "Inspections Completed") + kpi(highRisk, "High-Risk / Failed") + '</div>' +
+        '<div class="grid-2 mb"><div class="card" style="background:var(--navy);color:#fff;"><h3 style="color:#fff;">GATC Requests</h3><p style="font-size:13px;opacity:.85;margin:0 0 4px;">' + reqsPending + ' awaiting decision · ' + reqsRejected + ' rejected (action needed)</p><p class="tiny" style="opacity:.75;margin:0 0 12px;">Send testing requests to Government Approved Test Centres and track their approval or rejection with reasons.</p><button class="btn btn-gold" onclick="go(\'officer-gatc\')">Open GATC Requests</button></div>' +
+        '<div class="card" style="border-left:4px solid var(--danger);"><h3>High-Risk &amp; Outside Jurisdiction</h3><p class="tiny" style="margin-bottom:12px;">Priority cases, tampered seals and out-of-district requests needing authorization.</p><button class="btn btn-danger" onclick="go(\'officer-highrisk\')">Open Priority Cases</button></div></div>' +
+        '<div class="card"><h3>My Application Queue</h3><table class="table"><thead><tr><th>Application</th><th>Instrument</th><th>Establishment</th><th>Status</th><th>Action</th></tr></thead><tbody>' + queueRows + '</tbody></table></div>', "officer");
     }
 
     async function officerInspect() {
-      return shell("", '<p class="crumb">Field Test Sheet · OIML R 76</p><h1>Verification Test Sheet</h1><p class="intro">Record indicated weight at increasing loads and evaluate the inspection result.</p><div class="card" style="max-width:600px;"><div class="field"><label>Instrument Serial</label><input class="mono" readonly value="LM-UP-000127 — Sharma Kirana" /></div><table class="table mb"><thead><tr><th>Applied Load (kg)</th><th>Indicated Weight (kg)</th></tr></thead><tbody><tr><td class="mono">0 kg</td><td><input type="number" value="0.000" class="mono" /></td></tr><tr><td class="mono">50 kg</td><td><input type="number" value="50.002" class="mono" /></td></tr><tr><td class="mono">150 kg</td><td><input type="number" value="150.005" class="mono" /></td></tr><tr><td class="mono">300 kg (Max)</td><td><input type="number" value="300.010" class="mono" /></td></tr></tbody></table><div class="field"><label>Lead Wire &amp; Security Seal Intact?</label><select><option>Yes — Sealed securely</option><option>No — Broken / Tampered</option></select></div><div class="field"><label>Inspection Verdict</label><select id="insp-verdict"><option value="pass">PASS &amp; STAMP</option><option value="fail">FAIL / REJECT</option></select></div><button class="btn btn-ok btn-full" onclick="submitOfficerInspection()">Submit Inspection Result</button><div id="insp-out" class="mt"></div></div>', "officer");
+      const myApps = officerAssignedApps().filter(function(a){ return ["pending","submitted","approved","scheduled","gatc_assigned","inspection_completed"].indexOf(a.status) === -1 ? a.status !== "rejected" : true; });
+      const preAid = S.payload && S.payload.aid;
+      const options = myApps.map(function(a){
+        return '<option value="' + a.id + '"' + (Number(preAid) === Number(a.id) ? ' selected' : '') + '>' + a.public_id + ' — ' + a.serial + ' (' + a.instrument_name + ')</option>';
+      }).join("");
+      const myInspections = (DB.inspections || []).filter(function(i){ return Number(i.officer_id) === Number(S.user ? S.user.id : -1); }).slice(0, 8);
+      let historyRows = "";
+      myInspections.forEach(function(i) {
+        const photos = (i.photos || []).map(function(p){ return '<a href="' + p.url + '" target="_blank"><img class="insp-photo" src="' + p.url + '" alt="inspection photo" title="' + (p.name || "photo") + '"></a>'; }).join(" ") || '<span class="tiny">No photos</span>';
+        const gps = i.gps && i.gps.lat != null ? '<a class="gps-chip" target="_blank" href="https://www.openstreetmap.org/?mlat=' + i.gps.lat + '&mlon=' + i.gps.lng + '#map=16/' + i.gps.lat + '/' + i.gps.lng + '">📍 ' + Number(i.gps.lat).toFixed(5) + ', ' + Number(i.gps.lng).toFixed(5) + '</a>' : '<span class="tiny">No GPS</span>';
+        historyRows += '<tr><td class="mono"><b>' + i.code + '</b><div class="tiny">' + (i.inspected_on || "") + '</div></td><td><span class="mono">' + i.serial + '</span><div class="tiny">' + i.instrument_name + '</div></td><td>' + chip(i.verdict === "pass" ? "pass" : "fail") + (i.verdict === "fail" ? '<div class="tiny bad-text">' + (i.failure_reason_label || "") + '</div>' : '') + '</td><td>' + photos + '</td><td>' + gps + '</td></tr>';
+      });
+      if (!historyRows) historyRows = '<tr><td colspan="5" class="tiny" style="text-align:center;padding:24px;">No inspections recorded yet. Submit your first field inspection above.</td></tr>';
+      return shell("", '<p class="crumb">Field Test Sheet · OIML R 76</p><h1>Field Inspection</h1><p class="intro">Record measurements, capture site photos and GPS location, and submit the inspection result. Failed inspections require a structured failure reason.</p>' +
+      '<div class="grid-2" style="grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);"><div><div class="card"><h3>Inspection Details</h3>' +
+      '<div class="field"><label>Application / Instrument</label><select id="insp-app"><option value="">— Select an assigned application —</option>' + options + '</select></div>' +
+      '<table class="table mb" id="meas-table"><thead><tr><th>Applied Load (kg)</th><th>Indicated Weight (kg)</th><th>Error (kg)</th><th></th></tr></thead><tbody></tbody></table>' +
+      '<button class="linkish" onclick="addMeasurementRow()">＋ Add measurement row</button>' +
+      '<div class="grid-2 mt"><div class="field"><label>Lead Wire &amp; Security Seal</label><select id="insp-seal"><option value="intact">Intact — sealed securely</option><option value="loose">Loose</option><option value="tampered">Broken / Tampered</option><option value="not_checked">Not checked</option></select></div>' +
+      '<div class="field"><label>Inspection Verdict</label><select id="insp-verdict" onchange="toggleFailReason()"><option value="pass">PASS &amp; STAMP</option><option value="fail">FAIL / REJECT</option></select></div></div>' +
+      '<div id="fail-reason-block" style="display:none;"><div class="field"><label>Failure Reason *</label><select id="insp-fail-reason"><option value="">— Select failure reason —</option>' + Object.keys(REASONS.failure).map(function(k){ return '<option value="' + k + '">' + REASONS.failure[k] + '</option>'; }).join("") + '</select></div>' +
+      '<div class="field"><label>Failure note</label><input id="insp-fail-note" placeholder="Details about the failure (e.g. seal wire location)..." /></div></div>' +
+      '<div class="field"><label>General notes</label><textarea id="insp-notes" rows="2" placeholder="Observations, site details..."></textarea></div>' +
+      '</div>' +
+      '<div class="card"><h3>Photos &amp; GPS</h3>' +
+      '<div class="field"><label>Inspection photos (up to 6)</label><input id="insp-photos" type="file" accept="image/*" capture="environment" multiple onchange="previewInspectionPhotos(this)" /><div id="insp-photo-preview" class="row mt" style="gap:8px;"></div></div>' +
+      '<div class="field"><label>GPS location</label><div class="row"><button type="button" class="btn btn-navy" onclick="captureInspectionGPS()">📍 Capture GPS Location</button><span id="gps-status" class="tiny"></span></div><div id="gps-display" class="mt"></div></div>' +
+      '<button class="btn btn-ok btn-full" onclick="submitOfficerInspection()">Submit Inspection Result</button><div id="insp-out" class="mt"></div></div></div>' +
+      '<div><div class="card" style="background:#f7f9fc;"><h3>How inspections work</h3><ul class="steps"><li><span class="dot on"></span>Select the assigned application.</li><li><span class="dot on"></span>Record load vs indicated weight — errors are computed automatically.</li><li><span class="dot on"></span>Check the lead seal and note the verdict.</li><li><span class="dot on"></span>Attach site photos and capture GPS.</li><li><span class="dot on"></span>FAIL requires a structured failure reason (third-party part, tampered seal, MPE exceeded...).</li></ul></div></div></div>' +
+      '<div class="card mt"><h3>My Recent Inspections</h3><div style="overflow-x:auto;"><table class="table"><thead><tr><th>Inspection</th><th>Instrument</th><th>Result</th><th>Photos</th><th>GPS</th></tr></thead><tbody>' + historyRows + '</tbody></table></div></div>', "officer");
     }
-    function submitOfficerInspection() {
+
+    let INSP_GPS = null;
+    function addMeasurementRow(load, indicated) {
+      const tb = document.querySelector("#meas-table tbody");
+      if (!tb) return;
+      const tr = document.createElement("tr");
+      tr.innerHTML = '<td><input type="number" step="any" class="mono meas-load" value="' + (load != null ? load : "") + '" placeholder="0" style="width:110px;"></td>' +
+        '<td><input type="number" step="any" class="mono meas-ind" value="' + (indicated != null ? indicated : "") + '" placeholder="0.000" style="width:120px;" oninput="updateMeasErrors()"></td>' +
+        '<td class="mono meas-err" style="color:var(--muted);">—</td>' +
+        '<td><button class="linkish bad-text" onclick="this.closest(\'tr\').remove()" title="Remove row">✕</button></td>';
+      tb.appendChild(tr);
+    }
+
+    function updateMeasErrors() {
+      document.querySelectorAll("#meas-table tbody tr").forEach(function(tr) {
+        const l = parseFloat(tr.querySelector(".meas-load").value);
+        const i = parseFloat(tr.querySelector(".meas-ind").value);
+        const cell = tr.querySelector(".meas-err");
+        if (!isNaN(l) && !isNaN(i)) {
+          const e = i - l;
+          cell.textContent = (e >= 0 ? "+" : "") + e.toFixed(4);
+          cell.style.color = Math.abs(e) > 0 ? "var(--warn)" : "var(--muted)";
+        } else { cell.textContent = "—"; cell.style.color = "var(--muted)"; }
+      });
+    }
+
+    function toggleFailReason() {
+      const v = $("#insp-verdict") ? $("#insp-verdict").value : "pass";
+      const block = document.getElementById("fail-reason-block");
+      if (block) block.style.display = v === "fail" ? "block" : "none";
+    }
+
+    function captureInspectionGPS() {
+      const status = document.getElementById("gps-status");
+      const display = document.getElementById("gps-display");
+      if (!navigator.geolocation) {
+        if (status) status.textContent = "GPS is not supported on this device/browser.";
+        if (display) display.innerHTML = '<div class="tiny warn-text">Location will be recorded as “not captured”.</div>';
+        INSP_GPS = { granted: false };
+        return;
+      }
+      if (status) status.textContent = "Requesting location permission…";
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        INSP_GPS = { granted: true, lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, captured_at: new Date().toISOString() };
+        if (status) status.textContent = "Location captured.";
+        if (display) display.innerHTML = '<a class="gps-chip" target="_blank" href="https://www.openstreetmap.org/?mlat=' + pos.coords.latitude + '&mlon=' + pos.coords.longitude + '#map=16/' + pos.coords.latitude + '/' + pos.coords.longitude + '">📍 ' + pos.coords.latitude.toFixed(6) + ', ' + pos.coords.longitude.toFixed(6) + ' (±' + Math.round(pos.coords.accuracy) + ' m)</a>';
+      }, function(err) {
+        INSP_GPS = { granted: false, error: err.code };
+        if (status) status.textContent = err.code === 1 ? "Location permission denied — submission will note GPS unavailable." : "Location unavailable (" + err.message + ").";
+        if (display) display.innerHTML = '<div class="tiny warn-text">GPS not captured. The inspection can still be submitted; the record will note that location was unavailable.</div>';
+      }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+    }
+
+    function previewInspectionPhotos(input) {
+      const box = document.getElementById("insp-photo-preview");
+      if (!box || !input.files) return;
+      box.innerHTML = "";
+      Array.from(input.files).slice(0, 6).forEach(function(f) {
+        const img = document.createElement("img");
+        img.className = "insp-photo";
+        img.src = URL.createObjectURL(f);
+        img.title = f.name;
+        box.appendChild(img);
+      });
+    }
+
+    async function submitOfficerInspection() {
+      const out = $("#insp-out");
+      const appSel = $("#insp-app");
+      const aid = appSel ? appSel.value : "";
+      if (!aid) { if (out) out.innerHTML = '<div class="err">Select the application / instrument being inspected.</div>'; return; }
       const verdict = $("#insp-verdict") ? $("#insp-verdict").value : "pass";
-      if (verdict === "pass") {
-        $("#insp-out").innerHTML = '<div class="card" style="background:#e4f2ea;color:var(--green-d);">Inspection successfully completed. <b>Instrument passed OIML R 76 checks.</b> Result recorded in the audit ledger.</div>';
-      } else {
-        $("#insp-out").innerHTML = '<div class="card" style="background:#f8e4df;color:var(--danger);">Inspection recorded as <b>FAIL / REJECT</b>. Instrument has been flagged for enforcement follow-up.</div>';
+      const failReason = $("#insp-fail-reason") ? $("#insp-fail-reason").value : "";
+      if (verdict === "fail" && !failReason) { if (out) out.innerHTML = '<div class="err">A failure reason is required when the verdict is FAIL.</div>'; return; }
+      const measurements = [];
+      document.querySelectorAll("#meas-table tbody tr").forEach(function(tr) {
+        const l = tr.querySelector(".meas-load").value, i = tr.querySelector(".meas-ind").value;
+        if (l !== "" && i !== "") measurements.push({ load_kg: parseFloat(l), indicated_kg: parseFloat(i) });
+      });
+      if (!measurements.length) { if (out) out.innerHTML = '<div class="err">Add at least one measurement row (applied load and indicated weight).</div>'; return; }
+      const btn = document.querySelector("#insp-out") ? document.querySelector('button[onclick="submitOfficerInspection()"]') : null;
+      if (btn) { btn.disabled = true; btn.textContent = "Submitting…"; }
+      const fd = new FormData();
+      fd.append("application_id", aid);
+      fd.append("measurements", JSON.stringify(measurements));
+      fd.append("seal_condition", $("#insp-seal") ? $("#insp-seal").value : "not_checked");
+      fd.append("verdict", verdict);
+      if (verdict === "fail") { fd.append("failure_reason_code", failReason); fd.append("failure_note", $("#insp-fail-note") ? $("#insp-fail-note").value.trim() : ""); }
+      fd.append("notes", $("#insp-notes") ? $("#insp-notes").value.trim() : "");
+      fd.append("gps", JSON.stringify(INSP_GPS || { granted: false }));
+      const files = $("#insp-photos") && $("#insp-photos").files ? $("#insp-photos").files : [];
+      for (let k = 0; k < Math.min(files.length, 6); k++) fd.append("photos", files[k]);
+      try {
+        const r = await api("/api/inspections", { method: "POST", body: fd });
+        addNotification("admin", verdict === "pass" ? "Inspection Completed — PASS" : "Inspection Failed", r.inspection.code + " · " + r.inspection.serial + (r.inspection.failure_reason_label ? " (" + r.inspection.failure_reason_label + ")" : ""), verdict === "pass" ? "✅" : "⚠️", "admin-inspections");
+        if (verdict === "fail") addNotification("user", "Verification Failed", "Your instrument " + r.inspection.serial + " failed inspection: " + (r.inspection.failure_reason_label || "") + ".", "❌", "verification-applications");
+        toast("Inspection " + r.inspection.code + " submitted" + (verdict === "fail" ? " — instrument flagged " + (r.inspection.failure_reason_label || "failed") : " — PASS"), verdict === "pass" ? "ok" : "warn");
+        await refreshBootstrap();
+        go("officer-inspect");
+      } catch (e) {
+        if (out) out.innerHTML = '<div class="err">' + (e.message || "Submission failed") + '</div>';
+        if (btn) { btn.disabled = false; btn.textContent = "Submit Inspection Result"; }
       }
     }
 
@@ -1717,6 +2690,82 @@
       return '<span class="gatc-status ' + cls + '">' + label.charAt(0).toUpperCase() + label.slice(1) + '</span>';
     }
 
+    // ---------------- GATC: MO request inbox ----------------
+    function gatcInboxRequests() {
+      const g = currentGatc();
+      const gid = (S.user && (S.user.gatc_id || S.user.id)) || g.id;
+      const gcode = g.code || (S.user && S.user.lmo_code) || "";
+      return (DB.gatc_requests || []).filter(function(r) {
+        return !r.gatc_id || Number(r.gatc_id) === Number(gid) || (gcode && r.gatc_code === gcode);
+      }).sort(function(a,b){ return String(b.created_on || "").localeCompare(String(a.created_on || "")); });
+    }
+
+    async function gatcInbox() {
+      if (!S.user || S.user.role !== "gatc") return go("login-unified");
+      const reqs = gatcInboxRequests();
+      const pending = reqs.filter(function(r){ return r.status === "pending"; });
+      const decided = reqs.filter(function(r){ return r.status !== "pending"; });
+      function row(r) {
+        let action = '<span class="tiny">—</span>';
+        if (r.status === "pending") {
+          action = '<div style="display:flex;gap:6px;"><button class="btn btn-ok" style="padding:6px 12px;font-size:12px;" onclick="gatcDecideRequest(' + r.id + ',\'approved\')">Approve</button><button class="btn btn-danger" style="padding:6px 12px;font-size:12px;" onclick="gatcDecideRequest(' + r.id + ',\'rejected\')">Reject</button></div>';
+        }
+        const reasonCol = r.status === "rejected"
+          ? '<div class="reason-box" style="margin-top:0;"><b>' + (r.reason_label || reasonLabel("gatc_rejection", r.reason_code)) + '</b>' + (r.reason_note || "") + '</div>'
+          : '<span class="tiny">—</span>';
+        return '<tr><td class="mono"><b>' + r.code + '</b><div class="tiny">' + (r.created_on || "") + '</div></td>' +
+          '<td><b>' + r.officer_name + '</b><div class="tiny mono">' + (r.officer_code || "") + '</div></td>' +
+          '<td>' + (r.public_id ? '<span class="mono tiny">' + r.public_id + '</span><br>' : '') + '<span class="mono">' + r.serial + '</span><div class="tiny">' + r.instrument_name + '</div></td>' +
+          '<td style="max-width:220px;"><b class="tiny">' + (r.subject || "GATC testing request") + '</b><div class="tiny">' + (r.message || "") + '</div></td>' +
+          '<td>' + chip(r.status === "pending" ? "under_review" : r.status) + '</td>' +
+          '<td style="max-width:200px;">' + reasonCol + '</td><td>' + action + '</td></tr>';
+      }
+      const pendingRows = pending.map(row).join("") || '<tr><td colspan="7" class="tiny" style="text-align:center;padding:24px;">No pending MO requests. 🎉</td></tr>';
+      const decidedRows = decided.map(row).join("") || '<tr><td colspan="7" class="tiny" style="text-align:center;padding:24px;">No decided requests yet.</td></tr>';
+      return shell("", '<p class="crumb">GATC Portal · Metrology Officer Requests</p><h1>MO Requests Inbox</h1><p class="intro">Metrology Officers send testing requests to this centre. <b>Approve</b> a request to accept the instrument for testing (it gets assigned to your centre), or <b>Reject</b> it — a rejection reason is mandatory and is sent back to the MO.</p>' +
+      '<div class="gatc-kpi-grid" style="grid-template-columns:repeat(3,minmax(0,1fr));">' +
+        '<div class="gatc-kpi-card warn"><div class="kpi-icon">📥</div><b>' + pending.length + '</b><span>Pending Requests</span><small>Awaiting your decision</small></div>' +
+        '<div class="gatc-kpi-card ok"><div class="kpi-icon">✓</div><b>' + reqs.filter(function(r){return r.status==="approved";}).length + '</b><span>Approved</span><small>Instruments accepted for testing</small></div>' +
+        '<div class="gatc-kpi-card danger"><div class="kpi-icon">×</div><b>' + reqs.filter(function(r){return r.status==="rejected";}).length + '</b><span>Rejected</span><small>Returned to MO with reason</small></div>' +
+      '</div>' +
+      '<section class="gatc-panel mb"><div class="gatc-panel-head"><h3>Pending Requests</h3></div><div class="gatc-table-wrap"><table class="gatc-table" style="min-width:760px;"><thead><tr><th>Request</th><th>From (MO)</th><th>Instrument</th><th>Message</th><th>Status</th><th>Rejection Reason</th><th>Action</th></tr></thead><tbody>' + pendingRows + '</tbody></table></div></section>' +
+      '<section class="gatc-panel"><div class="gatc-panel-head"><h3>Decided Requests</h3></div><div class="gatc-table-wrap"><table class="gatc-table" style="min-width:760px;"><thead><tr><th>Request</th><th>From (MO)</th><th>Instrument</th><th>Message</th><th>Status</th><th>Rejection Reason</th><th>Action</th></tr></thead><tbody>' + decidedRows + '</tbody></table></div></section>', "gatc");
+    }
+
+    async function gatcDecideRequest(rid, decision) {
+      const r = (DB.gatc_requests || []).find(function(x){ return Number(x.id) === Number(rid); });
+      if (!r) return;
+      let reasonCode = null, reasonNote = "";
+      if (decision === "rejected") {
+        const res = await confirmDialog({
+          title: "Reject this MO request?",
+          message: "Request <b class='mono'>" + r.code + "</b> from " + r.officer_name + " will be <b>rejected</b> and sent back to the MO with your reason.",
+          confirmText: "Reject Request",
+          danger: true,
+          requireReason: { family: "gatc_rejection", label: "Rejection reason (sent to the MO)", required: true }
+        });
+        if (!res.ok) return;
+        reasonCode = res.reasonCode; reasonNote = res.reasonNote;
+      } else {
+        const res = await confirmDialog({
+          title: "Approve this MO request?",
+          message: "Approving assigns instrument <b class='mono'>" + r.serial + "</b>" + (r.public_id ? " (application " + r.public_id + ")" : "") + " to your centre for testing.",
+          confirmText: "Approve Request",
+          danger: false
+        });
+        if (!res.ok) return;
+      }
+      try {
+        const resp = await api("/api/gatc-requests/" + rid + "/decision", { method: "POST", body: { decision: decision, reason_code: reasonCode, reason_note: reasonNote } });
+        addNotification("officer", decision === "approved" ? "GATC Request Approved" : "GATC Request Rejected", resp.request.code + (decision === "rejected" ? " was rejected. Reason: " + (resp.request.reason_label || "") : " was approved — instrument assigned to " + (resp.request.gatc_code || "your centre") + "."), decision === "approved" ? "✅" : "❌", "officer-gatc");
+        toast(decision === "approved" ? "Request approved — instrument assigned to your centre." : "Request rejected — reason sent back to the MO.", decision === "approved" ? "ok" : "warn");
+        await refreshBootstrap();
+        go("gatc-inbox");
+      } catch (e) {
+        toast(e.message || "Decision failed", "error");
+      }
+    }
+
     async function gatcHome() {
       const g = currentGatc();
       const apps = gatcApps();
@@ -1726,6 +2775,8 @@
       const pending = assigned.filter(function(a){ return !a.gatc_test_result; }).length;
       const passed = apps.filter(function(a){ return a.gatc_test_result === "pass"; }).length;
       const failed = apps.filter(function(a){ return a.gatc_test_result === "fail"; }).length;
+      const inboxReqs = gatcInboxRequests();
+      const inboxPending = inboxReqs.filter(function(r){ return r.status === "pending"; }).length;
       const recent = apps.slice(0,5);
       const requestRows = recent.map(function(a){
         const result = gatcTestResultLabel(a);
@@ -1740,6 +2791,7 @@
 
       return shell("", '<div class="gatc-page-head"><div><h1>GATC Dashboard</h1><p>Welcome back, ' + (g.name || "Government Approved Test Centre") + '</p></div><div class="gatc-date">▣ &nbsp; 28 August 2026, Thursday</div></div>' +
         '<div class="gatc-kpi-grid">' +
+          '<div class="gatc-kpi-card ' + (inboxPending ? 'warn' : '') + '" style="cursor:pointer;' + (inboxPending ? '' : '') + '" onclick="go(\'gatc-inbox\')"><div class="kpi-icon">📥</div><b>' + inboxPending + '</b><span>MO Requests Pending</span><small>Approve or reject with reason →</small></div>' +
           '<div class="gatc-kpi-card"><div class="kpi-icon">▤</div><b>' + assigned.length + '</b><span>Assigned Instruments</span><small>Instruments assigned for testing</small></div>' +
           '<div class="gatc-kpi-card warn"><div class="kpi-icon">◷</div><b>' + todayTests + '</b><span>Today’s Tests</span><small>Scheduled for today</small></div>' +
           '<div class="gatc-kpi-card ok"><div class="kpi-icon">▣</div><b>' + pending + '</b><span>Pending Tests</span><small>Awaiting instrument testing</small></div>' +
@@ -1753,6 +2805,7 @@
         '<div class="gatc-bottom-grid">' +
           '<section class="gatc-panel"><div class="gatc-panel-head"><h3>Test Summary</h3></div><div class="gatc-summary"><div class="gatc-donut"></div><div class="gatc-legend"><div><i></i>Passed <b>' + passed + '</b></div><div class="fail"><i></i>Failed <b>' + failed + '</b></div><div class="pend"><i></i>Pending <b>' + pending + '</b></div></div></div></section>' +
           '<section class="gatc-panel"><div class="gatc-panel-head"><h3>Quick Actions</h3></div><div class="gatc-actions"><div class="gatc-action-grid">' +
+            '<button class="gatc-action-card" onclick="go(\'gatc-inbox\')"><div class="aicon">📥</div><b>MO Requests</b><span>Approve / reject officer requests</span></button>' +
             '<button class="gatc-action-card" onclick="go(\'gatc-requests\')"><div class="aicon">▤</div><b>Assigned Instruments</b><span>View instruments assigned for testing</span></button>' +
             '<button class="gatc-action-card" onclick="go(\'gatc-schedule\')"><div class="aicon">▣</div><b>Test Schedule</b><span>View upcoming instrument tests</span></button>' +
             '<button class="gatc-action-card" onclick="go(\'gatc-results\')"><div class="aicon">☑</div><b>Test Results</b><span>Review submitted test results</span></button>' +
@@ -1784,7 +2837,13 @@
       if (!a) return shell("", '<div class="card"><h3>Assigned instrument not found</h3><button class="btn btn-navy mt" onclick="go(\'gatc-requests\')">Back to Assigned Instruments</button></div>', "gatc");
       const inst = DB.instruments.find(function(i){ return i.id === a.instrument_id; });
       const authorized = gatcEligibleForInstrument(inst);
-      return shell("", '<p class="crumb">GATC Portal · Instrument Test</p><div class="row"><div><h1>Instrument Test Desk</h1><p class="intro">GATC performs the instrument test only. The assigned instrument must be tested and the result submitted to the government workflow.</p></div>' + (authorized ? '<span class="chip ok">✓ CATEGORY AUTHORIZED</span>' : '<span class="chip bad">✕ CATEGORY NOT AUTHORIZED</span>') + '</div><div class="grid-2"><div><div class="card"><h3>Assigned Instrument</h3><table class="table"><tr><th>Application</th><td class="mono">' + a.public_id + '</td></tr><tr><th>Instrument</th><td>' + a.instrument_name + '</td></tr><tr><th>Serial</th><td class="mono">' + a.serial + '</td></tr><tr><th>Owner</th><td>' + a.applicant_name + '</td></tr><tr><th>Establishment</th><td>' + a.org + '</td></tr><tr><th>Location</th><td>' + a.district + '</td></tr><tr><th>Scheduled Test</th><td>' + (a.schedule ? a.schedule.date + ' · ' + a.schedule.time : 'Not scheduled') + '</td></tr></table></div><div class="card"><h3>Instrument Information</h3><p class="tiny">Manufacturer: ' + (inst ? inst.manufacturer : "—") + ' · Model: ' + (inst ? inst.model : "—") + '</p><p class="tiny">Current status: ' + (inst ? chip(inst.status) : "—") + '</p></div></div><div class="card"><h3>Instrument Test</h3><div class="gatc-check-grid"><div class="gatc-check-item"><label>Instrument Identification</label><select id="gatc-ident"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Seal Inspection</label><select id="gatc-seal"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Measurement Accuracy</label><select id="gatc-accuracy"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Display / Nozzle Inspection</label><select id="gatc-display"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div></div><div class="field mt"><label>Test Readings</label><textarea id="gatc-readings" rows="4" placeholder="Enter measured readings, applied loads, observed values or other test readings..."></textarea></div><div class="gatc-evidence mt"><label style="display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:7px;">Photo / Evidence</label><input id="gatc-evidence" type="file" accept="image/*,.pdf" multiple></div><div class="field mt"><label>Test Result</label><select id="gatc-verdict"><option value="pass">PASS</option><option value="fail">FAIL</option></select></div><div class="field"><label>Remarks</label><textarea id="gatc-remarks" rows="3" placeholder="Add test remarks..."></textarea></div><button class="btn btn-ok btn-full" ' + (!authorized ? 'disabled title="GATC is not authorized for this instrument category"' : '') + ' onclick="submitGatcTest(' + a.id + ')">Submit Test Result</button><div id="gatc-result-out" class="mt"></div></div></div>', "gatc");
+      return shell("", '<p class="crumb">GATC Portal · Instrument Test</p><div class="row"><div><h1>Instrument Test Desk</h1><p class="intro">GATC performs the instrument test only. The assigned instrument must be tested and the result submitted to the government workflow.</p></div>' + (authorized ? '<span class="chip ok">✓ CATEGORY AUTHORIZED</span>' : '<span class="chip bad">✕ CATEGORY NOT AUTHORIZED</span>') + '</div><div class="grid-2"><div><div class="card"><h3>Assigned Instrument</h3><table class="table"><tr><th>Application</th><td class="mono">' + a.public_id + '</td></tr><tr><th>Instrument</th><td>' + a.instrument_name + '</td></tr><tr><th>Serial</th><td class="mono">' + a.serial + '</td></tr><tr><th>Owner</th><td>' + a.applicant_name + '</td></tr><tr><th>Establishment</th><td>' + a.org + '</td></tr><tr><th>Location</th><td>' + a.district + '</td></tr><tr><th>Scheduled Test</th><td>' + (a.schedule ? a.schedule.date + ' · ' + a.schedule.time : 'Not scheduled') + '</td></tr></table></div><div class="card"><h3>Instrument Information</h3><p class="tiny">Manufacturer: ' + (inst ? inst.manufacturer : "—") + ' · Model: ' + (inst ? inst.model : "—") + '</p><p class="tiny">Current status: ' + (inst ? chip(inst.status) : "—") + '</p></div></div><div class="card"><h3>Instrument Test</h3><div class="gatc-check-grid"><div class="gatc-check-item"><label>Instrument Identification</label><select id="gatc-ident"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Seal Inspection</label><select id="gatc-seal"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Measurement Accuracy</label><select id="gatc-accuracy"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div><div class="gatc-check-item"><label>Display / Nozzle Inspection</label><select id="gatc-display"><option value="pass">PASS</option><option value="fail">FAIL</option><option value="na">NOT APPLICABLE</option></select></div></div><div class="field mt"><label>Test Readings</label><textarea id="gatc-readings" rows="4" placeholder="Enter measured readings, applied loads, observed values or other test readings..."></textarea></div><div class="gatc-evidence mt"><label style="display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:7px;">Photo / Evidence</label><input id="gatc-evidence" type="file" accept="image/*,.pdf" multiple></div><div class="field mt"><label>Test Result</label><select id="gatc-verdict" onchange="toggleGatcFailReason()"><option value="pass">PASS</option><option value="fail">FAIL</option></select></div><div class="field" id="gatc-fail-reason-block" style="display:none;"><label>Failure Reason *</label><select id="gatc-fail-reason"><option value="">— Select failure reason —</option>' + Object.keys(REASONS.failure).map(function(k){ return '<option value="' + k + '">' + REASONS.failure[k] + '</option>'; }).join("") + '</select></div><div class="field"><label>Remarks</label><textarea id="gatc-remarks" rows="3" placeholder="Add test remarks..."></textarea></div><button class="btn btn-ok btn-full" ' + (!authorized ? 'disabled title="GATC is not authorized for this instrument category"' : '') + ' onclick="submitGatcTest(' + a.id + ')">Submit Test Result</button><div id="gatc-result-out" class="mt"></div></div></div>', "gatc");
+    }
+
+    function toggleGatcFailReason() {
+      const v = $("#gatc-verdict") ? $("#gatc-verdict").value : "pass";
+      const block = document.getElementById("gatc-fail-reason-block");
+      if (block) block.style.display = v === "fail" ? "block" : "none";
     }
 
     function submitGatcTest(aid) {
@@ -1797,6 +2856,12 @@
         return;
       }
       const verdict = $("#gatc-verdict") ? $("#gatc-verdict").value : "pass";
+      const failReason = $("#gatc-fail-reason") ? $("#gatc-fail-reason").value : "";
+      if (verdict === "fail" && !failReason) {
+        const out = $("#gatc-result-out");
+        if (out) out.innerHTML = '<div class="card" style="background:#f8e4df;color:var(--danger);"><b>Failure reason required.</b><br>Select a structured failure reason (third-party issue, tampered seal, MPE exceeded...) for a FAIL result.</div>';
+        return;
+      }
       const remarks = $("#gatc-remarks") ? $("#gatc-remarks").value.trim() : "";
       const readings = $("#gatc-readings") ? $("#gatc-readings").value.trim() : "";
       const evidence = $("#gatc-evidence") && $("#gatc-evidence").files ? Array.from($("#gatc-evidence").files).map(function(f){ return f.name; }) : [];
@@ -1811,11 +2876,15 @@
       a.gatc_test_readings = readings;
       a.gatc_test_evidence = evidence;
       a.gatc_test_remarks = remarks;
+      if (verdict === "fail") {
+        a.gatc_failure_reason_code = failReason;
+        a.gatc_failure_reason_label = reasonLabel("failure", failReason);
+      }
       a.gatc_tested_on = new Date().toISOString();
       a.gatc_tested_by = S.user ? S.user.name : "GATC Operator";
       a.status = verdict === "pass" ? "payment_pending" : "failed";
       if (inst && verdict === "pass") { inst.status = "tested"; inst.last_tested = a.gatc_tested_on.slice(0,10); }
-      if (inst && verdict === "fail") { inst.status = "test_failed"; }
+      if (inst && verdict === "fail") { inst.status = "test_failed"; inst.high_risk = (failReason === "tampered_seal" || failReason === "third_party_issue"); inst.risk_reason = a.gatc_failure_reason_label; }
       persistInstrument(inst);
       addNotification("admin", verdict === "pass" ? "GATC Test Passed" : "GATC Test Failed", a.public_id + " test result submitted by " + currentGatc().code + ".", verdict === "pass" ? "✅" : "⚠️", "admin-inspections");
       addNotification("gatc", "Test Result Submitted", a.public_id + " has been recorded as " + (verdict === "pass" ? "PASS" : "FAIL") + ".", verdict === "pass" ? "✅" : "⚠️", "gatc-results", {aid: aid});
@@ -1842,18 +2911,31 @@
       document.body.insertAdjacentHTML("beforeend", '<div id="verification-payment-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.58);display:grid;place-items:center;z-index:10001;padding:18px;"><div class="card" style="width:100%;max-width:520px;background:#fff;"><div class="row"><h3 style="margin:0;">Verification Payment</h3><button class="btn btn-ghost right" onclick="document.getElementById(\'verification-payment-modal\').remove()">×</button></div><p class="tiny">Application <b class="mono">' + a.public_id + '</b></p><table class="table"><tr><th>Instrument</th><td>' + a.instrument_name + '</td></tr><tr><th>Serial</th><td class="mono">' + a.serial + '</td></tr><tr><th>Amount</th><td><b>₹' + amount.toLocaleString("en-IN") + '</b></td></tr></table><div style="background:#f6f8fb;border:1px solid #e1e7ed;border-radius:8px;padding:12px;font-size:12px;color:#66758a;">Demo payment screen — no real money is charged.</div><button class="btn btn-saffron btn-full mt" onclick="completeVerificationPayment(' + a.id + ',' + amount + ')">Pay ₹' + amount.toLocaleString("en-IN") + '</button></div></div>');
     }
 
-    function completeVerificationPayment(aid, amount) {
+    async function completeVerificationPayment(aid, amount) {
       const a = DB.applications.find(function(x){ return x.id === aid && x.workflow === "verification"; });
       if (!a) return;
-      a.payment = { status: "paid", amount: amount, paid_on: new Date().toISOString(), payment_id: "PAY-" + Date.now() };
-      a.status = "payment_paid";
-      saveVerificationWorkflow();
-      addNotification("officer", "Payment Received", a.public_id + " payment received. Application is ready for the next processing stage.", "💳", "officer-queue");
-      addNotification("user", "Payment Received", "Payment for " + a.public_id + " was received. Your application has moved to the next processing stage.", "💳", "verification-applications", {aid:aid});
-      const modal = document.getElementById("verification-payment-modal");
-      if (modal) modal.remove();
-      alert("Payment received successfully. Your application has moved to the next processing stage.");
-      go("verification-applications");
+      try {
+        const r = await api("/api/payments", { method: "POST", body: { application_id: aid, amount: amount } });
+        if (r.application) {
+          Object.assign(a, r.application);
+          if (Array.isArray(DB.applications)) {
+            const idx = DB.applications.findIndex(function(x){ return x.id === aid; });
+            if (idx >= 0) DB.applications[idx] = Object.assign({}, DB.applications[idx], r.application);
+          }
+        }
+        saveVerificationWorkflow();
+        addNotification("officer", "Payment Received", a.public_id + " payment received (txn " + (r.payment ? r.payment.transaction_id : "") + "). Certificate is now available.", "💳", "officer-queue");
+        addNotification("user", "Payment Received", "Payment for " + a.public_id + " was received. Your digital certificate has been issued.", "💳", "verification-applications", {aid:aid});
+        await refreshBootstrap();
+        const modal = document.getElementById("verification-payment-modal");
+        if (modal) modal.remove();
+        toast("Payment received successfully. Your digital certificate has been issued.", "ok");
+        go("verification-applications");
+      } catch (e) {
+        const modal = document.getElementById("verification-payment-modal");
+        if (modal) modal.remove();
+        toast(e.message || "Payment failed. Please try again.", "error");
+      }
     }
 
     async function gatcResults() {
@@ -1952,6 +3034,7 @@
       "admin-applications": adminApplications,
       "admin-gatc-network": adminGatcNetwork,
       "admin-gatc-assign": adminGatcAssign,
+      "admin-gatc-requests": adminGatcRequests,
       "admin-assign": adminAssign,
       "admin-inspections": adminInspections,
       "admin-risk": adminRisk,
@@ -1964,7 +3047,10 @@
       "officer-review": officerReview,
       "officer-schedule": officerSchedule,
       "officer-inspect": officerInspect,
+      "officer-gatc": officerGatcView,
+      "officer-highrisk": officerHighRiskView,
       "gatc-home": gatcHome,
+      "gatc-inbox": gatcInbox,
       "gatc-requests": gatcRequests,
       "gatc-schedule": gatcSchedule,
       "gatc-test": gatcTest,
@@ -1979,6 +3065,13 @@
         const html = await fn();
         app.innerHTML = html;
         bindPhotoCheckEvents();
+        if (S.view === "landing") hydrateLandingStats();
+        if (S.view === "officer-inspect" && !document.querySelector("#meas-table tbody tr")) {
+          addMeasurementRow(0, 0);
+          addMeasurementRow(50, 50.002);
+          addMeasurementRow(150, 150.005);
+          updateMeasErrors();
+        }
       } catch (e) {
         app.innerHTML = '<div class="hero">' + topPublic() + '<div class="err">' + e.message + '</div></div>';
       }
@@ -1987,15 +3080,7 @@
     (async function boot() {
       const h = location.hash.replace("#", "");
       if (h) S.view = h;
-      try {
-        const bootstrap = await api("/api/bootstrap");
-        if (Array.isArray(bootstrap.instruments)) DB.instruments = bootstrap.instruments;
-        if (Array.isArray(bootstrap.applications)) DB.applications = bootstrap.applications;
-        if (Array.isArray(bootstrap.complaints)) DB.complaints = bootstrap.complaints;
-        if (Array.isArray(bootstrap.certificates)) DB.certificates = bootstrap.certificates;
-        if (Array.isArray(bootstrap.audit)) DB.audit = bootstrap.audit;
-        if (Array.isArray(bootstrap.notifications)) DB.notifications = bootstrap.notifications;
-      } catch (e) {}
+      await refreshBootstrap();
       try {
         const me = await api("/api/me");
         S.user = me.user;
